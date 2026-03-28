@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eeml-2026-application"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "pandas>=2.1",
+    "pyyaml>=6.0",
+    "pyspi>=2.0.1",
+    "matplotlib>=3.8",
+    "seaborn>=0.13",
+    "scikit-learn>=1.4",
+    "umap-learn>=0.5.5",
+    "tqdm>=4.66",
+    "psutil>=5.9",
+    "pyarrow>=15.0",
+    "JPype1>=1.5",
+    "xarray",
+    "dtaidistance==2.3.13",
+    "dtw-python",
+    "fastdtw",
+    "infomeasure>=0.6.0",
+    "torch>=2.10.0",
+    "torch-geometric>=2.7.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
+[tool.setuptools.packages.find]
+include = ["src*"]

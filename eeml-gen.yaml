@@ -1,0 +1,51 @@
+base_output_dir: data/260327_eeml/
+timestamp: false
+pyspi_config: configs/pyspi-v2/cases/eeml.yaml
+pyspi_subset: default
+normalise: false
+rng_seed: 110305
+save_heatmap: false
+threads: 4
+
+defaults:
+  M_values: [10]
+  T_values: [500]
+  instances: 1500
+
+# ---------------------------------------------------------------------------
+# Generator A: directed VAR motifs
+# ---------------------------------------------------------------------------
+
+mts_classes:
+  - name: "var-chain"
+    labels: ["var", "chain"]
+    generator: "var_chat_a"
+    base_params:
+      motif_class: 0
+      alpha_lo: 0.3
+      alpha_hi: 0.7
+      rho_nuisance: 0.8
+      noise_std: 0.1
+      zscore: true
+
+  - name: "var-fork"
+    labels: ["var", "fork"]
+    generator: "var_chat_a"
+    base_params:
+      motif_class: 1
+      alpha_lo: 0.3
+      alpha_hi: 0.7
+      rho_nuisance: 0.8
+      noise_std: 0.1
+      zscore: true
+
+  - name: "var-collider"
+    labels: ["var", "collider"]
+    generator: "var_chat_a"
+    base_params:
+      motif_class: 2
+      alpha_lo: 0.3
+      alpha_hi: 0.7
+      rho_nuisance: 0.8
+      noise_std: 0.1
+      zscore: true
