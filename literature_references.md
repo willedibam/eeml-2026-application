@@ -26,6 +26,7 @@
 ### Choice of statistic matters
 - **Liu et al. (2025).** Benchmarking methods for mapping functional connectivity in the brain. *Nature Methods*. DOI: 10.1038/s41592-025-02704-4. — **KEY.** Used pyspi (239 measures) on fMRI. Found substantial variation across FC methods. Covariance/precision outperformed Pearson on several benchmarks. Same pyspi ecosystem. Supports our core premise.
 - **Mohanty et al. (2020).** Rethinking measures of functional connectivity via feature extraction. *Scientific Reports*, 10(1), 1298. — Pearson correlation "cannot comprehensively capture BOLD inter-dependencies"; 8 alternative FC measures improved classification.
+- **Qi et al. (2025).** Rethinking functional brain connectome analysis: do graph deep learning models help? *npj AI*. — **KEY.** Message-passing "consistently degrades" on FC graphs when construction is naive. Graph construction (not architecture) is the critical variable. Strongest existing empirical support for our core premise.
 
 ### Group sparsity
 - **Yuan & Lin (2006).** Model selection and estimation in regression with grouped variables. *JRSSB*, 68(1), 49–67. — Group lasso.
@@ -90,7 +91,6 @@
 - **Smith et al. (2011).** Network modelling methods for FMRI. *NeuroImage*, 54(2), 875–891. — Partial correlation >> Pearson for simulated fMRI.
 - **Pervaiz et al. (2020).** Optimising network modelling methods for fMRI. *NeuroImage*, 211, 116604. — >9,000 pipeline variants, choice significantly affects prediction.
 - **Bielczyk et al. (2019).** Disentangling causal webs in the brain using fMRI. *Network Neuroscience*, 3(2), 237–273. — No single causal method dominates.
-- **Qi et al. (2025).** Rethinking functional brain connectome analysis: do graph deep learning models help? *npj AI*. — Message-passing "consistently degrades" on FC. Graph construction is the critical variable.
 - **Li et al. (2022).** BrainGB: A benchmark for brain network analysis with GNNs. *IEEE TMI*, 42(5), 1446–1456. — 375 architecture variants but only correlation-based FC.
 - **Barnett & Seth (2014).** The MVGC multivariate Granger causality toolbox. *J Neurosci Methods*, 223, 50–68.
 
