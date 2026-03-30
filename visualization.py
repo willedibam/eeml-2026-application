@@ -41,8 +41,8 @@ STYLE = {
     "savefig.dpi": 300,
     "savefig.bbox": "tight",
     "savefig.pad_inches": 0.05,
-    "axes.spines.top": False,
-    "axes.spines.right": False,
+    # "axes.spines.top": False,
+    # "axes.spines.right": False,
 }
 
 # Model colours — warm = SPI vocabulary, cool = controls
