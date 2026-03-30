@@ -453,6 +453,19 @@ def _run_standard(args: argparse.Namespace, data_dir: Path, output_dir: Path) ->
         "n_val": len(val_data),
         "n_test": len(test_data),
         "n_nodes": M,
+        "hyperparameters": {
+            "lr": args.lr,
+            "batch_size": args.batch_size,
+            "max_epochs": args.max_epochs,
+            "patience": args.patience,
+            "l1_lambda": args.l1_lambda,
+            "group_lambda": args.group_lambda,
+            "warmup_epochs": args.warmup_epochs,
+            "w_lr_mult": args.w_lr_mult,
+            "restarts": args.restarts,
+            "top_d": args.top_d,
+            "no_cosine_decay": args.no_cosine_decay,
+        },
         "models": {},
     }
     for model_name, results in all_results.items():
@@ -666,6 +679,19 @@ def _run_sample_efficiency(
         "n_node_features": F_n,
         "models_run": models_to_run,
         "seeds": args.seeds,
+        "hyperparameters": {
+            "lr": args.lr,
+            "batch_size": args.batch_size,
+            "max_epochs": args.max_epochs,
+            "patience": args.patience,
+            "l1_lambda": args.l1_lambda,
+            "group_lambda": args.group_lambda,
+            "warmup_epochs": args.warmup_epochs,
+            "w_lr_mult": args.w_lr_mult,
+            "restarts": args.restarts,
+            "top_d": args.top_d,
+            "no_cosine_decay": args.no_cosine_decay,
+        },
         "results": results_by_n,
     }
 

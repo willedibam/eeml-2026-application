@@ -28,8 +28,9 @@ import seaborn as sns
 # ---------------------------------------------------------------------------
 
 STYLE = {
-    "font.family": "sans-serif",
-    "font.sans-serif": ["Helvetica", "Arial", "DejaVu Sans"],
+    "text.usetex": True,
+    "font.family": "serif",
+    "font.serif": ["Computer Modern Roman"],
     "font.size": 8,
     "axes.labelsize": 9,
     "axes.titlesize": 9,
@@ -98,6 +99,8 @@ FAMILY_COLORS = {
     "rank": "#78909C",
 }
 
+MOTIF_NODE_LABELS = {0: r"$A$", 1: r"$B$", 2: r"$C$"}
+
 
 def apply_style():
     """Apply publication-quality style globally."""
@@ -111,8 +114,8 @@ def apply_style():
 # Motif definitions: (edge_list, motif_node_indices)
 MOTIFS = {
     "Chain": ([(0, 1), (1, 2)], [0, 1, 2]),
-    "Fork": ([(0, 1), (0, 2)], [0, 1, 2]),
-    "Collider": ([(1, 0), (2, 0)], [0, 1, 2]),
+    "Fork": ([(1, 0), (2, 0)], [0, 1, 2]),
+    "Collider": ([(0, 1), (2, 1)], [0, 1, 2]),
 }
 
 
@@ -125,7 +128,7 @@ def plot_motif_graph(
 ) -> tuple[plt.Figure, plt.Axes]:
     """
     Draw a directed motif graph with M nodes.
-    3 motif nodes are highlighted; remaining are faint nuisance nodes.
+    3 motif nodes in A-B-C linear layout; nuisance nodes in outer ring.
     """
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=figsize)
@@ -138,18 +141,28 @@ def plot_motif_graph(
     G.add_nodes_from(range(M))
     G.add_edges_from(edges)
 
-    # Layout: motif nodes in a triangle at centre, nuisance nodes in a ring
+    # Layout: motif nodes in a horizontal line (A-B-C)
     pos = {}
-    # Motif triangle
-    motif_positions = [(-0.3, 0.3), (0.3, 0.3), (0.0, -0.3)]
+    motif_positions = [(-0.35, 0.0), (0.0, 0.0), (0.35, 0.0)]
     for i, node in enumerate(motif_nodes):
         pos[node] = motif_positions[i]
 
-    # Nuisance nodes in outer ring
+    # Nuisance nodes in outer ring with faint dotted inter-connections
     nuisance = [n for n in range(M) if n not in motif_nodes]
     for i, node in enumerate(nuisance):
         angle = 2 * np.pi * i / len(nuisance) - np.pi / 2
         pos[node] = (0.7 * np.cos(angle), 0.7 * np.sin(angle))
+
+    # Draw faint dotted edges between nuisance nodes (visual only)
+    if len(nuisance) > 1:
+        nuisance_edges = []
+        for i in range(len(nuisance)):
+            for j in range(i + 1, len(nuisance)):
+                nuisance_edges.append((nuisance[i], nuisance[j]))
+        nx.draw_networkx_edges(
+            G.to_undirected(), pos, edgelist=nuisance_edges,
+            edge_color="#E0E0E0", width=0.3, style="dotted", ax=ax,
+        )
 
     # Draw nuisance nodes
     nx.draw_networkx_nodes(
@@ -167,8 +180,8 @@ def plot_motif_graph(
         width=2.0, arrows=True, arrowsize=12,
         connectionstyle="arc3,rad=0.1", ax=ax,
     )
-    # Labels on motif nodes only
-    motif_labels = {n: str(n) for n in motif_nodes}
+    # Labels on motif nodes: A, B, C
+    motif_labels = {n: MOTIF_NODE_LABELS[i] for i, n in enumerate(motif_nodes)}
     nx.draw_networkx_labels(
         G, pos, labels=motif_labels, font_size=7,
         font_color="white", font_weight="bold", ax=ax,
@@ -183,16 +196,47 @@ def plot_motif_graph(
     return fig, ax
 
 
-def plot_motif_graphs_row(
-    M: int = 10,
-    figsize: tuple = (6.0, 2.2),
-) -> tuple[plt.Figure, list[plt.Axes]]:
-    """Draw all three motif graphs side by side."""
-    fig, axes = plt.subplots(1, 3, figsize=figsize)
-    for ax, name in zip(axes, ["Chain", "Fork", "Collider"]):
-        plot_motif_graph(name, M=M, ax=ax)
-    fig.tight_layout(pad=0.5)
-    return fig, axes
+def plot_time_series(
+    data,
+    *,
+    ax: Optional[plt.Axes] = None,
+    figsize: tuple = (4.0, 2.0),
+    max_T: int | None = 200,
+    title: str | None = None,
+    alpha: float = 0.7,
+) -> tuple[plt.Figure, plt.Axes]:
+    """
+    Plot univariate or multivariate time series.
+
+    Parameters
+    ----------
+    data : array-like or str/Path
+        (T,) or (T, M) array, or path to .npy file.
+    """
+    if ax is None:
+        fig, ax = plt.subplots(1, 1, figsize=figsize)
+    else:
+        fig = ax.figure
+
+    if isinstance(data, (str, Path)):
+        data = np.load(data)
+    data = np.atleast_2d(data)
+    if data.shape[0] < data.shape[1]:
+        data = data.T  # ensure (T, M)
+
+    if max_T is not None and data.shape[0] > max_T:
+        data = data[:max_T]
+
+    T, M = data.shape
+    for m in range(M):
+        ax.plot(range(T), data[:, m], linewidth=0.6, alpha=alpha)
+
+    ax.set_xlabel(r"Time ($t$)")
+    ax.set_ylabel("Amplitude")
+    if title:
+        ax.set_title(title, fontsize=8)
+
+    return fig, ax
 
 
 def plot_mts_heatmap(
@@ -205,8 +249,7 @@ def plot_mts_heatmap(
     max_T: int | None = 200,
 ) -> tuple[plt.Figure, plt.Axes]:
     """
-    Carpet plot (T x M heatmap) from a timeseries.npy file.
-    Truncates to max_T timesteps for visual clarity.
+    Carpet plot (M x T heatmap) from a timeseries.npy file using imshow.
     """
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=figsize)
@@ -218,19 +261,21 @@ def plot_mts_heatmap(
         ts = ts[:max_T]
 
     vmax = np.abs(ts).max()
-    sns.heatmap(
-        ts.T, ax=ax, cmap=cmap, center=0, vmin=-vmax, vmax=vmax,
-        cbar=False, xticklabels=False, yticklabels=False,
+    ax.imshow(
+        ts.T, aspect="auto", cmap=cmap, vmin=-vmax, vmax=vmax,
+        interpolation="nearest",
     )
-    ax.set_xlabel("Time ($t$)", fontsize=7)
-    ax.set_ylabel("Channel ($m$)", fontsize=7)
+    ax.set_xlabel(r"Time ($t$)", fontsize=7)
+    ax.set_ylabel(r"Channel ($m$)", fontsize=7)
+    ax.set_xticks([])
+    ax.set_yticks([])
     if title:
         ax.set_title(title, fontsize=8)
 
     return fig, ax
 
 
-def plot_spi_heatmap(
+def plot_mpi_heatmap(
     npz_path: str | Path,
     spi_name: str,
     *,
@@ -241,7 +286,7 @@ def plot_spi_heatmap(
     show_colorbar: bool = False,
 ) -> tuple[plt.Figure, plt.Axes]:
     """
-    Plot one SPI matrix (M x M) from spi_mpis.npz.
+    Plot one SPI matrix (M x M) from spi_mpis.npz using imshow.
 
     Automatically selects diverging cmap for asymmetric SPIs (causal family),
     sequential for symmetric ones.
@@ -263,14 +308,19 @@ def plot_spi_heatmap(
         cmap = "RdBu_r" if is_asymmetric else "YlOrRd"
 
     vmax = np.abs(mat).max() if np.abs(mat).max() > 0 else 1.0
-    kwargs = dict(cmap=cmap, xticklabels=False, yticklabels=False, square=True)
 
     if is_asymmetric:
-        kwargs.update(center=0, vmin=-vmax, vmax=vmax)
+        im = ax.imshow(mat, cmap=cmap, vmin=-vmax, vmax=vmax,
+                        interpolation="nearest", aspect="equal")
     else:
-        kwargs.update(vmin=0, vmax=vmax)
+        im = ax.imshow(mat, cmap=cmap, vmin=0, vmax=vmax,
+                        interpolation="nearest", aspect="equal")
 
-    sns.heatmap(mat, ax=ax, cbar=show_colorbar, **kwargs)
+    if show_colorbar:
+        plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+
+    ax.set_xticks([])
+    ax.set_yticks([])
 
     label = title if title else spi_name
     sym_tag = "directed" if is_asymmetric else "symmetric"
@@ -279,35 +329,8 @@ def plot_spi_heatmap(
     return fig, ax
 
 
-def plot_spi_stack(
-    npz_path: str | Path,
-    spi_names: list[str],
-    titles: list[str] | None = None,
-    figsize_per: tuple = (1.5, 1.3),
-    ncols: int = 1,
-) -> tuple[plt.Figure, list[plt.Axes]]:
-    """
-    Plot a vertical stack of SPI heatmaps — the Panel B component.
-    """
-    nrows = int(np.ceil(len(spi_names) / ncols))
-    fig, axes = plt.subplots(
-        nrows, ncols,
-        figsize=(figsize_per[0] * ncols, figsize_per[1] * nrows),
-    )
-    axes_flat = np.atleast_1d(axes).flatten()
-
-    if titles is None:
-        titles = spi_names
-
-    for i, (name, title) in enumerate(zip(spi_names, titles)):
-        plot_spi_heatmap(npz_path, name, ax=axes_flat[i], title=title)
-
-    # Hide unused axes
-    for j in range(len(spi_names), len(axes_flat)):
-        axes_flat[j].axis("off")
-
-    fig.tight_layout(pad=0.3)
-    return fig, list(axes_flat[:len(spi_names)])
+# Alias for backwards compatibility
+plot_spi_heatmap = plot_mpi_heatmap
 
 
 # ---------------------------------------------------------------------------
@@ -320,6 +343,47 @@ def load_results(results_path: str | Path) -> dict:
         return json.load(f)
 
 
+def overlay_model(
+    ax: plt.Axes,
+    results_path: str | Path,
+    model: str,
+    *,
+    metric: str = "f1",
+    color: str | None = None,
+    label: str | None = None,
+    marker: str | None = None,
+    linestyle: str | None = None,
+) -> plt.Axes:
+    """
+    Overlay a single model's sample efficiency curve onto an existing axes.
+    Useful for composing curves from different result files.
+    """
+    data = load_results(results_path)
+    n_values = sorted(int(k) for k in data["results"].keys())
+
+    c = color or MODEL_COLORS.get(model, "#333333")
+    lbl = label or MODEL_LABELS.get(model, model)
+    mk = marker or MODEL_MARKERS.get(model, "o")
+    ls = linestyle or MODEL_LINESTYLES.get(model, "-")
+
+    means, stds, ns = [], [], []
+    for n in n_values:
+        n_str = str(n)
+        model_data = data["results"][n_str]["models"].get(model)
+        if model_data is None:
+            continue
+        means.append(model_data[f"{metric}_mean"])
+        stds.append(model_data[f"{metric}_std"])
+        ns.append(n)
+
+    means, stds = np.array(means), np.array(stds)
+    ax.plot(ns, means, color=c, marker=mk, label=lbl,
+            linestyle=ls, linewidth=1.5, markersize=4, zorder=3)
+    ax.fill_between(ns, means - stds, np.minimum(means + stds, 1.0),
+                    color=c, alpha=0.12, zorder=2)
+    return ax
+
+
 def plot_sample_efficiency(
     results_path: str | Path,
     *,
@@ -329,11 +393,18 @@ def plot_sample_efficiency(
     show_chance: bool = True,
     show_symmetric_ceiling: bool = True,
     metric: str = "f1",
+    band_mode: str = "std",
+    grid: bool = True,
 ) -> tuple[plt.Figure, plt.Axes]:
     """
     Sample efficiency curves: F1 (or acc) vs n/class for all models.
 
-    Reads from the standard results JSON format.
+    Parameters
+    ----------
+    band_mode : str
+        "std" (default), "sem", or "minmax".
+    grid : bool
+        Show light grid lines (default True).
     """
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=figsize)
@@ -344,7 +415,6 @@ def plot_sample_efficiency(
     n_values = sorted(int(k) for k in data["results"].keys())
 
     if models is None:
-        # Determine from first n entry
         first_n = data["results"][str(n_values[0])]
         models = list(first_n["models"].keys())
 
@@ -354,7 +424,7 @@ def plot_sample_efficiency(
         marker = MODEL_MARKERS.get(model, "o")
         ls = MODEL_LINESTYLES.get(model, "-")
 
-        means, stds, ns = [], [], []
+        means, stds, ns, all_seeds = [], [], [], []
         for n in n_values:
             n_str = str(n)
             if n_str not in data["results"]:
@@ -365,28 +435,51 @@ def plot_sample_efficiency(
             means.append(model_data[f"{metric}_mean"])
             stds.append(model_data[f"{metric}_std"])
             ns.append(n)
+            # Collect per-seed values for sem/minmax
+            per_seed = model_data.get("per_seed", [])
+            seed_vals = [s.get(f"test_{metric}", s.get(metric, 0))
+                         for s in per_seed]
+            all_seeds.append(seed_vals)
 
         means, stds = np.array(means), np.array(stds)
 
         ax.plot(ns, means, color=color, marker=marker, label=label,
                 linestyle=ls, linewidth=1.5, markersize=4, zorder=3)
-        ax.fill_between(ns, means - stds, np.minimum(means + stds, 1.0),
-                        color=color, alpha=0.12, zorder=2)
+
+        if band_mode == "std":
+            lo = means - stds
+            hi = np.minimum(means + stds, 1.0)
+        elif band_mode == "sem":
+            n_seeds = np.array([len(s) for s in all_seeds])
+            sem = stds / np.sqrt(np.maximum(n_seeds, 1))
+            lo = means - sem
+            hi = np.minimum(means + sem, 1.0)
+        elif band_mode == "minmax":
+            lo = np.array([min(s) if s else m for s, m in zip(all_seeds, means)])
+            hi = np.array([max(s) if s else m for s, m in zip(all_seeds, means)])
+        else:
+            lo = means - stds
+            hi = np.minimum(means + stds, 1.0)
+
+        ax.fill_between(ns, lo, hi, color=color, alpha=0.12, zorder=2)
 
     if show_chance:
-        ax.axhline(1 / 3, color="#BDBDBD", linestyle="--", linewidth=0.8,
+        ax.axhline(1 / 3, color="#D32F2F", linestyle="--", linewidth=1.2,
                     zorder=1, label="Chance (1/3)")
     if show_symmetric_ceiling:
-        ax.axhline(2 / 3, color="#BDBDBD", linestyle=":", linewidth=0.8,
+        ax.axhline(2 / 3, color="#9E9E9E", linestyle=":", linewidth=0.8,
                     zorder=1, label="Symmetric ceiling (2/3)")
 
     ax.set_xscale("log")
     ax.set_xticks(n_values)
     ax.get_xaxis().set_major_formatter(ticker.ScalarFormatter())
-    ax.set_xlabel("Training samples per class ($n$)")
+    ax.set_xlabel(r"Training samples per class ($n$)")
     ax.set_ylabel("Macro F1")
     ax.set_ylim(0.15, 1.05)
     ax.legend(loc="lower right", framealpha=0.9, ncol=2)
+
+    if grid:
+        ax.grid(True, alpha=0.2, linewidth=0.5)
 
     return fig, ax
 
@@ -398,12 +491,13 @@ def plot_sample_efficiency_multi(
     ax: Optional[plt.Axes] = None,
     figsize: tuple = (5.5, 3.5),
     metric: str = "f1",
+    band_mode: str = "std",
+    grid: bool = True,
 ) -> tuple[plt.Figure, plt.Axes]:
     """
     Overlay sample efficiency curves from multiple result files.
 
     results_paths: {model_name: path} — each file contributes one model's data.
-    Useful when edge-ablation is in a separate results file.
     """
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=figsize)
@@ -450,15 +544,18 @@ def plot_sample_efficiency_multi(
         ax.fill_between(ns, means - stds, np.minimum(means + stds, 1.0),
                         color=color, alpha=0.12, zorder=2)
 
-    ax.axhline(1 / 3, color="#BDBDBD", linestyle="--", linewidth=0.8, zorder=1)
-    ax.axhline(2 / 3, color="#BDBDBD", linestyle=":", linewidth=0.8, zorder=1)
+    ax.axhline(1 / 3, color="#D32F2F", linestyle="--", linewidth=1.2, zorder=1)
+    ax.axhline(2 / 3, color="#9E9E9E", linestyle=":", linewidth=0.8, zorder=1)
 
     ax.set_xscale("log")
     ax.get_xaxis().set_major_formatter(ticker.ScalarFormatter())
-    ax.set_xlabel("Training samples per class ($n$)")
+    ax.set_xlabel(r"Training samples per class ($n$)")
     ax.set_ylabel("Macro F1")
     ax.set_ylim(0.15, 1.05)
     ax.legend(loc="lower right", framealpha=0.9, ncol=2)
+
+    if grid:
+        ax.grid(True, alpha=0.2, linewidth=0.5)
 
     return fig, ax
 
@@ -473,7 +570,6 @@ def plot_family_weights(
 ) -> tuple[plt.Figure, plt.Axes]:
     """
     Violin plot of learned |w| by SPI family, averaged across seeds.
-    Shows distribution of per-SPI weights within each family.
     """
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=figsize)
@@ -484,56 +580,51 @@ def plot_family_weights(
     spi_names = data["spi_names"]
     spi_families_dict = data.get("spi_families", {})
 
-    # Build index→family mapping from {family: [indices]} dict
     idx_to_family = {}
     for fam, indices in spi_families_dict.items():
         for idx in indices:
             idx_to_family[idx] = fam
 
-    # Get learned w across seeds
     n_str = str(n_value)
     per_seed = data["results"][n_str]["models"]["spi-mpnn"]["per_seed"]
     w_matrix = np.array([s["learned_w"] for s in per_seed])  # (n_seeds, K)
     w_mean = np.abs(w_matrix).mean(axis=0)  # (K,)
 
-    # Build dataframe for seaborn
     import pandas as pd
     records = []
     for k in range(len(spi_names)):
         records.append({
             "SPI": spi_names[k],
             "Family": idx_to_family.get(k, "other"),
-            "|w|": w_mean[k],
+            r"$|w|$": w_mean[k],
         })
     df = pd.DataFrame(records)
 
-    # Order families by total L2 norm
-    family_l2 = df.groupby("Family")["|w|"].apply(
+    family_l2 = df.groupby("Family")[r"$|w|$"].apply(
         lambda x: np.sqrt((x**2).sum())
     ).sort_values(ascending=False)
     family_order = family_l2.index.tolist()
 
     sns.violinplot(
-        data=df, y="Family", x="|w|", hue="Family", order=family_order,
+        data=df, y="Family", x=r"$|w|$", hue="Family", order=family_order,
         hue_order=family_order,
         palette={f: FAMILY_COLORS.get(f, "#999") for f in family_order},
         inner="quart", linewidth=0.8, cut=0, ax=ax, orient="h", legend=False,
     )
 
-    # Annotate top-k individual SPIs
-    top_spis = df.nlargest(top_k_labels, "|w|")
+    top_spis = df.nlargest(top_k_labels, r"$|w|$")
     for _, row in top_spis.iterrows():
         family_idx = family_order.index(row["Family"])
         short_name = _short_spi_name(row["SPI"])
         ax.annotate(
-            short_name, (row["|w|"], family_idx),
+            short_name, (row[r"$|w|$"], family_idx),
             textcoords="offset points", xytext=(5, 0),
             fontsize=5.5, fontstyle="italic", color="#333",
         )
 
-    ax.set_xlabel("Mean $|w_k|$ across seeds")
+    ax.set_xlabel(r"Mean $|w_k|$ across seeds")
     ax.set_ylabel("")
-    ax.set_title(f"Learned weights by family ($n$={n_value})", fontsize=8)
+    ax.set_title(rf"Learned weights by family ($n$={n_value})", fontsize=8)
 
     return fig, ax
 
@@ -546,8 +637,7 @@ def plot_family_bar(
     figsize: tuple = (3.0, 2.0),
 ) -> tuple[plt.Figure, plt.Axes]:
     """
-    Simple horizontal bar chart: family L2 norm of w.
-    Compact version for use inside Figure 1 Panel C.
+    Horizontal bar chart: family L2 norm of w.
     """
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=figsize)
@@ -558,7 +648,6 @@ def plot_family_bar(
     spi_names = data["spi_names"]
     spi_families_dict = data.get("spi_families", {})
 
-    # Build index→family mapping
     idx_to_family = {}
     for fam, indices in spi_families_dict.items():
         for idx in indices:
@@ -569,7 +658,6 @@ def plot_family_bar(
     w_matrix = np.array([s["learned_w"] for s in per_seed])
     w_mean = np.abs(w_matrix).mean(axis=0)
 
-    # Compute per-family L2
     family_l2 = {}
     for k in range(len(spi_names)):
         fam = idx_to_family.get(k, "other")
@@ -577,14 +665,13 @@ def plot_family_bar(
     family_l2 = {f: np.sqrt(np.sum(np.array(v) ** 2))
                  for f, v in family_l2.items()}
 
-    # Sort
     sorted_fams = sorted(family_l2.items(), key=lambda x: x[1], reverse=True)
     names = [f[0] for f in sorted_fams]
     vals = [f[1] for f in sorted_fams]
     colors = [FAMILY_COLORS.get(n, "#999") for n in names]
 
     ax.barh(names, vals, color=colors, edgecolor="white", linewidth=0.5)
-    ax.set_xlabel("$\\|\\mathbf{w}_g\\|_2$", fontsize=8)
+    ax.set_xlabel(r"$\|\mathbf{w}_g\|_2$", fontsize=8)
     ax.invert_yaxis()
     ax.set_title("Statistical signature", fontsize=8)
 
@@ -599,9 +686,15 @@ def plot_per_seed_strip(
     ax: Optional[plt.Axes] = None,
     figsize: tuple = (4.0, 2.5),
     metric: str = "f1",
+    show_violin: bool = False,
 ) -> tuple[plt.Figure, plt.Axes]:
     """
     Strip/swarm plot of per-seed F1 for selected models at a given n.
+
+    Parameters
+    ----------
+    show_violin : bool
+        If True, overlay a translucent violin behind the strip points.
     """
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=figsize)
@@ -633,14 +726,21 @@ def plot_per_seed_strip(
     palette = {MODEL_LABELS.get(m, m): MODEL_COLORS.get(m, "#333")
                for m in models}
 
+    if show_violin:
+        sns.violinplot(
+            data=df, x="Model", y="F1", hue="Model", palette=palette,
+            inner=None, linewidth=0.5, cut=0, ax=ax, legend=False,
+            alpha=0.15,
+        )
+
     sns.stripplot(
         data=df, x="Model", y="F1", hue="Model", palette=palette,
         jitter=0.15, size=5, alpha=0.8, ax=ax, legend=False,
     )
-    ax.axhline(1 / 3, color="#BDBDBD", linestyle="--", linewidth=0.7)
+    ax.axhline(1 / 3, color="#D32F2F", linestyle="--", linewidth=0.7)
     ax.set_ylabel("Per-seed Macro F1")
     ax.set_xlabel("")
-    ax.set_title(f"Per-seed performance ($n$={n_value})", fontsize=8)
+    ax.set_title(rf"Per-seed performance ($n$={n_value})", fontsize=8)
 
     return fig, ax
 
@@ -664,7 +764,6 @@ def _short_spi_name(name: str) -> str:
     for long, short in replacements:
         if name == long:
             return short
-    # Generic shortening
     if len(name) > 25:
         return name[:22] + "..."
     return name
@@ -688,8 +787,8 @@ def main():
     outdir.mkdir(exist_ok=True)
 
     data_dir = Path("data/260327_eeml")
-    results_main = Path("results/sample_efficiency_definitive_w60_cpu_results.json")
-    results_edge = Path("results/sample_efficiency_edge_ablation_cpu_results.json")
+    results_main = Path("results/sample_efficiency_30seeds_main_results.json")
+    results_edge = Path("results/sample_efficiency_edge_ablation_30seeds_results.json")
 
     # Example instance for SPI heatmaps
     instance = data_dir / "var-chain" / "M10_T500_I0"
@@ -702,11 +801,13 @@ def main():
     if do_fig1:
         print("=== Figure 1 components ===")
 
-        # Panel A: motif graphs
-        fig, _ = plot_motif_graphs_row(M=10)
-        fig.savefig(outdir / "fig1a_motif_graphs.pdf")
-        print(f"  Saved {outdir}/fig1a_motif_graphs.pdf")
-        plt.close(fig)
+        # Panel A: motif graphs (individual)
+        for name in ["Chain", "Fork", "Collider"]:
+            fig, _ = plot_motif_graph(name, M=10)
+            safe = name.lower()
+            fig.savefig(outdir / f"fig1a_motif_{safe}.pdf")
+            plt.close(fig)
+        print("  Saved motif graphs")
 
         # Panel A: MTS heatmaps (one per class)
         for cls in ["var-chain", "var-fork", "var-collider"]:
@@ -715,71 +816,68 @@ def main():
                 fig, _ = plot_mts_heatmap(ts, title=cls.replace("var-", ""))
                 fig.savefig(outdir / f"fig1a_mts_{cls}.pdf")
                 plt.close(fig)
-                print(f"  Saved fig1a_mts_{cls}.pdf")
+        print("  Saved MTS heatmaps")
 
-        # Panel B: SPI heatmap stack
-        spis_to_show = [
-            ("xcorr_mean_sig-True", "Cross-corr $\\bar{r}$"),
-            ("cov_EmpiricalCovariance", "Covariance"),
-            ("mi_gaussian", "MI (Gaussian)"),
-            ("sgc_parametric_mean_fs-1_fmin-0-25_fmax-0-5_order-1", "SGC (0.25–0.5 Hz)"),
-            ("gc_gaussian_k-1_kt-1_l-1_lt-1", "GC (Gaussian)"),
-            ("te_kraskov_k-4", "TE (Kraskov)"),
-        ]
-        spi_names_show = [s[0] for s in spis_to_show]
-        spi_titles = [s[1] for s in spis_to_show]
-
-        # Check which exist
-        with np.load(npz_path) as npz:
-            available = set(npz.files)
-        valid = [(n, t) for n, t in zip(spi_names_show, spi_titles) if n in available]
-        if valid:
-            fig, _ = plot_spi_stack(
-                npz_path,
-                [v[0] for v in valid],
-                titles=[v[1] for v in valid],
-            )
-            fig.savefig(outdir / "fig1b_spi_stack.pdf")
-            print(f"  Saved fig1b_spi_stack.pdf")
-            plt.close(fig)
-
-        # Panel B: chain vs fork comparison (Markov equivalence visual)
+        # Panel B: SPI heatmaps (chain vs fork comparison)
         for cls in ["var-chain", "var-fork"]:
             cls_npz = data_dir / cls / "M10_T500_I0" / "spi_mpis.npz"
             if cls_npz.exists():
-                for spi, title in [("xcorr_mean_sig-True", "$\\bar{r}$ (symmetric)"),
-                                   ("sgc_parametric_mean_fs-1_fmin-0-25_fmax-0-5_order-1", "SGC (directed)")]:
+                with np.load(cls_npz) as npz:
+                    available = set(npz.files)
+                for spi, title in [
+                    ("xcorr_mean_sig-True", r"$\bar{r}$ (symmetric)"),
+                    ("sgc_parametric_mean_fs-1_fmin-0-25_fmax-0-5_order-1",
+                     "SGC (directed)"),
+                ]:
                     if spi in available:
-                        fig, _ = plot_spi_heatmap(
+                        fig, _ = plot_mpi_heatmap(
                             cls_npz, spi,
-                            title=f"{cls.replace('var-', '')} — {title}",
+                            title=f"{cls.replace('var-', '')} -- {title}",
                         )
                         safe = spi.replace("-", "_")[:20]
                         fig.savefig(outdir / f"fig1b_{cls}_{safe}.pdf")
                         plt.close(fig)
-
         print("  Saved chain/fork comparison heatmaps")
 
-        # Panel C: family bar chart (compact, for inset)
+        # Panel B: MPI stack (selected SPIs)
+        if npz_path.exists():
+            with np.load(npz_path) as npz:
+                available = set(npz.files)
+            spis_to_show = [
+                ("xcorr_mean_sig-True", r"Cross-corr $\bar{r}$"),
+                ("sgc_parametric_mean_fs-1_fmin-0-25_fmax-0-5_order-1",
+                 "SGC (0.25--0.5 Hz)"),
+            ]
+            for spi_name, spi_title in spis_to_show:
+                if spi_name in available:
+                    fig, _ = plot_mpi_heatmap(
+                        npz_path, spi_name, title=spi_title,
+                    )
+                    safe = spi_name.replace("-", "_")[:20]
+                    fig.savefig(outdir / f"fig1b_mpi_{safe}.pdf")
+                    plt.close(fig)
+            print("  Saved MPI heatmaps")
+
+        # Panel C: family bar chart
         if results_main.exists():
             fig, _ = plot_family_bar(results_main, n_value=500)
             fig.savefig(outdir / "fig1c_family_bar.pdf")
-            print(f"  Saved fig1c_family_bar.pdf")
             plt.close(fig)
+            print("  Saved fig1c_family_bar.pdf")
 
     if do_fig2:
         print("=== Figure 2 components ===")
 
         if results_main.exists():
-            # Panel A: sample efficiency curves (main models)
+            # Panel A: sample efficiency curves
             fig, ax = plot_sample_efficiency(
                 results_main,
                 models=["spi-mpnn", "fixed-spi", "mlp-mix",
                         "correlation", "latent", "shuffled", "node-only"],
             )
             fig.savefig(outdir / "fig2a_sample_efficiency.pdf")
-            print(f"  Saved fig2a_sample_efficiency.pdf")
             plt.close(fig)
+            print("  Saved fig2a_sample_efficiency.pdf")
 
             # With edge-ablation overlaid
             if results_edge.exists():
@@ -788,45 +886,28 @@ def main():
                     models=["spi-mpnn", "fixed-spi", "mlp-mix",
                             "correlation", "latent", "shuffled", "node-only"],
                 )
-                # Overlay edge-ablation from separate file
-                edge_data = load_results(results_edge)
-                ns_e, means_e, stds_e = [], [], []
-                for n_str, v in edge_data["results"].items():
-                    m = v["models"].get("edge-ablation")
-                    if m:
-                        ns_e.append(int(n_str))
-                        means_e.append(m["f1_mean"])
-                        stds_e.append(m["f1_std"])
-                if ns_e:
-                    ns_e, means_e, stds_e = zip(*sorted(zip(ns_e, means_e, stds_e)))
-                    means_e, stds_e = np.array(means_e), np.array(stds_e)
-                    ax.plot(ns_e, means_e, color=MODEL_COLORS["edge-ablation"],
-                            marker="D", label=MODEL_LABELS["edge-ablation"],
-                            linestyle="--", linewidth=1.5, markersize=4, zorder=3)
-                    ax.fill_between(ns_e, means_e - stds_e,
-                                    np.minimum(means_e + stds_e, 1.0),
-                                    color=MODEL_COLORS["edge-ablation"],
-                                    alpha=0.12, zorder=2)
-                    ax.legend(loc="lower right", framealpha=0.9, ncol=2)
-
+                overlay_model(ax, results_edge, "edge-ablation")
+                ax.legend(loc="lower right", framealpha=0.9, ncol=2)
                 fig.savefig(outdir / "fig2a_sample_efficiency_with_edge_abl.pdf")
-                print(f"  Saved fig2a_sample_efficiency_with_edge_abl.pdf")
                 plt.close(fig)
+                print("  Saved fig2a_sample_efficiency_with_edge_abl.pdf")
 
             # Panel B: family weights violin
             fig, _ = plot_family_weights(results_main, n_value=500)
             fig.savefig(outdir / "fig2b_family_violin.pdf")
-            print(f"  Saved fig2b_family_violin.pdf")
             plt.close(fig)
+            print("  Saved fig2b_family_violin.pdf")
 
             # Panel C: per-seed strip
             fig, _ = plot_per_seed_strip(
                 results_main, n_value=500,
-                models=["spi-mpnn", "fixed-spi", "mlp-mix", "correlation", "latent"],
+                models=["spi-mpnn", "fixed-spi", "mlp-mix",
+                        "correlation", "latent"],
+                show_violin=True,
             )
             fig.savefig(outdir / "fig2c_per_seed_strip.pdf")
-            print(f"  Saved fig2c_per_seed_strip.pdf")
             plt.close(fig)
+            print("  Saved fig2c_per_seed_strip.pdf")
 
     print(f"\nAll outputs in {outdir}/")
 

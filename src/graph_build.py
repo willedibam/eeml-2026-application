@@ -168,10 +168,17 @@ class SPIScaler:
         self.is_fitted = True
         return self
 
-    def transform(self, tensor: np.ndarray) -> np.ndarray:
+    def transform(
+        self, tensor: np.ndarray, *, clip: float = 10.0
+    ) -> np.ndarray:
+        """Scale and clip to [-clip, clip] to prevent extreme outliers
+        from producing NaN in downstream softplus/linear layers."""
         if not self.is_fitted:
             raise RuntimeError("SPIScaler not fitted")
-        return (tensor - self.median_) / self.iqr_
+        scaled = (tensor - self.median_) / self.iqr_
+        if clip > 0:
+            scaled = np.clip(scaled, -clip, clip)
+        return scaled
 
 
 # ---------------------------------------------------------------------------

@@ -8,7 +8,7 @@ $^{1}$The University of Sydney
 
 ## Abstract
 
-Graph neural networks applied to multivariate time series (MTS) require a graph over observed variables, yet this graph is almost never given. Existing approaches either fix it from a single pairwise statistic — committing to one notion of dependence before learning begins — or learn it from latent embeddings, producing opaque adjacencies with no statistical semantics. We introduce a third approach: parameterising graph construction over a *vocabulary* of $K$ heterogeneous pairwise statistics spanning causal, spectral, linear, information-theoretic, and distance families, computed via `pyspi` [Cliff et al., 2023]. A learned weight vector $\mathbf{w} \in \mathbb{R}^K$, jointly optimised with a message passing neural network, simultaneously constructs the graph and identifies which statistical notion of coupling is task-relevant — yielding edges with named mathematical semantics. We prove that symmetric graph construction operators cannot distinguish Markov-equivalent directed topologies regardless of sample size, while directed statistics in our vocabulary break this equivalence. On synthetic VAR(1) topology classification, models consuming the SPI vocabulary achieve near-perfect accuracy (99–100%), while baselines using symmetric statistics (Pearson correlation, latent embeddings) remain at or below 59%, and even transfer entropy alone — the correct *type* of statistic — fails at chance due to estimation noise, confirming that vocabulary diversity, not any single measure, is the critical factor. The learned $\mathbf{w}$ concentrates on spectral Granger causality measures, recovering the generating process's causal structure in named, interpretable form. An edge-ablation study confirms the MPNN actively uses SPI descriptors to condition messages, not merely the learned topology.
+Graph neural networks for multivariate time series require a graph that is rarely given. We parameterise graph construction over a vocabulary of $K \approx 125$ named pairwise statistics — causal, spectral, linear, information-theoretic — computed via `pyspi` [Cliff et al., 2023]. A learned weight vector $\mathbf{w}$, jointly optimised with a message-passing network, selects which statistical notion of coupling is task-relevant. We prove that symmetric construction operators cannot distinguish Markov-equivalent topologies. On synthetic VAR(1) classification, the full vocabulary achieves 100% (std $< 1$%), while the oracle-best single statistic reaches 96% but with catastrophic seed failures (std 24%) and symmetric baselines remain at or below 59%. The learned $\mathbf{w}$ recovers spectral Granger causality as the dominant coupling mode, matching the generating process.
 
 ---
 
@@ -18,7 +18,7 @@ Message passing neural networks (MPNNs) derive their power from propagating info
 
 **Fixing the graph from a single statistic** — Pearson correlation in functional connectivity [Bullmore & Sporns, 2009], spatial distance in traffic networks [Li et al., 2018] — is a strong commitment to one mathematical notion of dependence. If the task-relevant coupling is directed, nonlinear, or frequency-specific, this is an expressiveness limitation of the graph construction operator, not a data limitation. Liu et al. [2025] recently benchmarked 239 pairwise statistics for functional connectivity mapping, finding "substantial quantitative and qualitative variation across FC methods" — empirical confirmation that the choice of construction statistic is consequential yet understudied.
 
-**Learning the graph from latent embeddings** — Graph WaveNet [Wu et al., 2019], MTGNN [Wu et al., 2020] — recovers flexibility at the cost of semantics. The learned adjacency is opaque: an edge weight of 0.7 encodes no information about *what form* of dependence it represents. Such graphs cannot be validated against domain knowledge or compared across tasks. They also place the full burden on the training signal to discover relational structure that statistical methodology could supply as prior knowledge.
+**Learning the graph from latent embeddings** — Neural Relational Inference [Kipf et al., 2018], Graph WaveNet [Wu et al., 2019], MTGNN [Wu et al., 2020] — recovers flexibility at the cost of semantics. The learned adjacency is opaque: an edge weight of 0.7 encodes no information about *what form* of dependence it represents. Such graphs cannot be validated against domain knowledge or compared across tasks. They also place the full burden on the training signal to discover relational structure that statistical methodology could supply as prior knowledge.
 
 Veličković & Blundell [2021] argued that aligning neural architectures with algorithmic structure yields favourable sample complexity; Veličković et al. [2022] demonstrated that injecting algorithmic priors improves sample efficiency over learning from scratch. We apply this principle to graph construction: rather than re-learning what "connectivity" means from raw data, we supply a pre-specified vocabulary of pairwise statistics with known mathematical properties and let end-to-end learning identify which elements are task-relevant.
 
@@ -34,11 +34,11 @@ where $\mathbf{w} \in \mathbb{R}^K$ is jointly optimised with the downstream MPN
 
 We formalise the intuition that the choice of construction statistic constrains what an MPNN can learn, analogous to Weisfeiler-Lehman expressiveness results for message passing [Xu et al., 2019; Morris et al., 2019].
 
-**Proposition.** Consider three 3-node VAR(1) motifs: chain ($X_0 \to X_1 \to X_2$), fork ($X_0 \to X_1,\; X_0 \to X_2$), and collider ($X_1 \to X_0 \leftarrow X_2$). Chain and fork are Markov equivalent [Verma & Pearl, 1990]: they encode identical conditional independence relations. Any graph construction operator using only symmetric statistics — correlation, mutual information, coherence, or any function $f$ satisfying $f(X_i, X_j) = f(X_j, X_i)$ — assigns identical edge weights to chain and fork, regardless of sample size or estimation quality. No MPNN operating on such a graph can exceed $2/3$ accuracy on the three-class task.
+**Proposition.** Consider three 3-node VAR(1) motifs over nodes $A, B, C$: chain ($A \to B \to C$), fork ($A \leftarrow B \to C$), and collider ($A \to B \leftarrow C$). All three share skeleton $A{-}B{-}C$. Chain and fork are Markov equivalent [Verma & Pearl, 1990]: they encode identical conditional independence relations ($A \perp C \mid B$, and no other). Any graph construction operator using only symmetric statistics — correlation, mutual information, coherence, or any function $f$ satisfying $f(X_i, X_j) = f(X_j, X_i)$ — assigns identical edge weights to chain and fork, regardless of sample size or estimation quality. No MPNN operating on such a graph can exceed $2/3$ accuracy on the three-class task.
 
-*Proof sketch.* Two DAGs are Markov equivalent iff they share the same skeleton and v-structures [Verma & Pearl, 1990]. Chain and fork share skeleton $\{(0,1), (1,2), (0,2)\}$ and have no v-structures. Any symmetric statistic $f(X_i, X_j)$ is a function of the joint distribution $P(X_i, X_j)$, which is identical for Markov-equivalent structures. Since the collider has a v-structure (its skeleton differs in conditional independence: $X_1 \not\perp X_2 \mid X_0$), it is distinguishable by all methods — serving as an internal control. $\square$
+*Proof sketch.* Two DAGs are Markov equivalent iff they share the same skeleton and v-structures [Verma & Pearl, 1990]. Chain ($A \to B \to C$) and fork ($A \leftarrow B \to C$) share skeleton $\{A{-}B,\; B{-}C\}$ and have no v-structures. Any symmetric statistic $f(X_i, X_j)$ depends only on the joint distribution $P(X_i, X_j)$, which is identical for Markov-equivalent structures. In finite samples, estimation noise introduces small asymmetries, but these are insufficient for reliable discrimination — as confirmed empirically (Correlation $\leq 59$%). The collider ($A \to B \leftarrow C$) has a v-structure and encodes a different independence ($A \perp C$ marginally), making it distinguishable by all methods — serving as an internal control. $\square$
 
-Directed statistics break this equivalence. In the chain, $\mathrm{SGC}(X_0 \to X_1) \gg \mathrm{SGC}(X_1 \to X_0)$; in the fork, $\mathrm{SGC}(X_0 \to X_1) \approx \mathrm{SGC}(X_0 \to X_2) \gg 0$ but $\mathrm{SGC}(X_1 \to X_2) \approx 0$. The asymmetric descriptor tensor $\mathbf{E}_{ij} \neq \mathbf{E}_{ji}$ provides the information needed for discrimination.
+Directed statistics break the chain–fork equivalence. In the chain, $\mathrm{SGC}(A \to B) \gg \mathrm{SGC}(B \to A)$; in the fork, $\mathrm{SGC}(B \to A) \approx \mathrm{SGC}(B \to C) \gg 0$ but $\mathrm{SGC}(A \to C) \approx 0$. The asymmetric descriptor tensor $\mathbf{E}_{ij} \neq \mathbf{E}_{ji}$ provides the information needed for discrimination.
 
 ---
 
@@ -46,7 +46,7 @@ Directed statistics break this equivalence. In the chain, $\mathrm{SGC}(X_0 \to 
 
 **SPI descriptor tensor.** Given $X \in \mathbb{R}^{M \times T}$ (z-scored), we compute $K$ pairwise statistics per ordered pair via `pyspi` [Cliff et al., 2023], yielding $\mathbf{E} \in \mathbb{R}^{M \times M \times K}$. Statistics are partitioned into families: **causal** (transfer entropy [Schreiber, 2000], Granger causality [Granger, 1969], spectral GC [Geweke, 1982], phase slope index), **spectral** (coherence, PLV, PLI), **linear** (covariance, precision, cross-correlation), **information** (mutual information), **distance** (DTW, Euclidean), and **rank** (Spearman, Kendall). Crucially, causal measures are asymmetric: $\mathbf{E}_{ij} \neq \mathbf{E}_{ji}$, enabling directed graph construction that symmetric operators cannot represent.
 
-**Learned graph construction.** $A_{ij} = \mathrm{softplus}(b + \mathbf{w}^\top \mathbf{E}_{ij})$ with $K + 1$ learnable parameters. Sparsified to top-$d$ outgoing edges per node. Group lasso: $\mathcal{L} = \mathcal{L}_{\mathrm{task}} + \lambda_1 \|\mathbf{w}\|_1 + \lambda_g \sum_{g \in \mathcal{G}} \|\mathbf{w}_g\|_2$.
+**Learned graph construction.** $A_{ij} = \mathrm{softplus}(b + \mathbf{w}^\top \mathbf{E}_{ij})$ with $K + 1$ learnable parameters. Sparsified to top-$d$ outgoing edges per node. Group lasso: $\mathcal{L} = \mathcal{L}_{\mathrm{task}} + \lambda_1 \|\mathbf{w}\|_1 + \lambda_g \sum_{g \in \mathcal{G}} \|\mathbf{w}_g\|_2$. Training uses Adam with LR warmup over 60 epochs and restart selection (best of 2 initialisations), addressing the non-convex landscape of the joint graph-construction optimisation.
 
 **Edge-attributed MPNN.** Retained edges carry $\mathbf{E}_{ij}$ as attributes. An edge network $\phi(\mathbf{E}_{ij}) = \mathrm{MLP}_\phi(\mathbf{E}_{ij})$ conditions messages on the full descriptor:
 
@@ -58,7 +58,7 @@ The SPI vocabulary informs both topology (via $\mathbf{w}$) and message content 
 
 ## 4 Experiments
 
-**Synthetic topology classification.** We generate $M{=}10$ node VAR(1) processes ($T{=}500$) with a 3-node directed motif (chain, fork, or collider) embedded among 7 nuisance AR(1) channels ($\rho{=}0.8$). Coupling strengths $\alpha \sim \mathrm{Uniform}(0.3, 0.7)$; 1500 instances per class. The `pyspi` vocabulary yields $K{=}125$ statistics after variance filtering.
+**Synthetic topology classification.** We generate $M{=}10$ node VAR(1) processes ($T{=}500$) with a 3-node directed motif ($A{\to}B{\to}C$, $A{\leftarrow}B{\to}C$, or $A{\to}B{\leftarrow}C$) embedded among 7 nuisance AR(1) channels ($\rho{=}0.8$). Coupling strengths $\alpha \sim \mathrm{Uniform}(0.3, 0.7)$; 1500 instances per class. The `pyspi` vocabulary yields $K{=}125$ statistics after variance filtering.
 
 **Models.** Each baseline isolates a component:
 
@@ -66,7 +66,9 @@ The SPI vocabulary informs both topology (via $\mathbf{w}$) and message content 
 |---|---|---|
 | **SPI-MPNN** | $\mathrm{softplus}(b + \mathbf{w}^\top \mathbf{E}_{ij})$, learned | Full method |
 | Correlation | Fixed $|r_{ij}|$ | Symmetric single-statistic |
-| TE-Only | Fixed $|\mathrm{TE}_{ij}|$ | Directed single-statistic |
+| TE-Only | Fixed $|\mathrm{TE}_{ij}|$ | Directed single-statistic (nonparametric) |
+| SGC-Only | Fixed $|\mathrm{SGC}_{ij}|$ | Oracle-best single SPI from learned $\mathbf{w}$ |
+| Top-3 SPIs | Fixed mean $|\mathrm{SPI}|$, 3-dim edge feat. | Oracle top-3 from learned $\mathbf{w}$ |
 | Latent | Learned node embeddings | No statistical prior |
 | Fixed-SPI | Fully connected, $\mathbf{E}_{ij}$ as edge features | Is learned topology necessary? |
 | MLP-Mix | $\sigma(\mathrm{MLP}(\mathbf{E}_{ij}))$ | Nonlinear construction |
@@ -74,22 +76,24 @@ The SPI vocabulary informs both topology (via $\mathbf{w}$) and message content 
 | Shuffled | SPIs permuted across pairs | Pair-correspondence control |
 | Node-Only | Fully connected, no edge features | Are pairwise features necessary? |
 
-**Results.** Macro F1 (%), 10 seeds. Training: LR warmup (60 epochs), restarts (best of 2), top-$d{=}5$, group $\lambda{=}0.02$.
+**Results.** Macro F1 (%), 10 seeds. Top-$d{=}5$, group $\lambda{=}0.02$.
 
-| $n$/class | SPI-MPNN | Fixed-SPI | MLP-Mix | Edge-Abl. | Correlation | TE-Only | Latent | Shuffled | Node-Only |
-|---|---|---|---|---|---|---|---|---|---|
-| 20 | 57±22 | **72±12** | 63±10 | 35±14 | 35±5 | 29±1 | 30±2 | 34±4 | 33±2 |
-| 50 | **92±2** | 92±2 | 80±7 | 56±25 | 47±13 | 28±1 | 33±1 | 38±5 | 31±2 |
-| 100 | **97±2** | 98±1 | 88±7 | 53±21 | 57±2 | 27±8 | 32±2 | 37±3 | 31±3 |
-| 200 | 98±5 | **98±1** | 95±5 | 78±25 | 53±11 | 26±3 | 31±2 | 41±5 | 30±2 |
-| 500 | 98±4 | **99±0.5** | 99±2 | 88±23 | 59±1 | 20±4 | 31±2 | 55±19 | 32±3 |
-| 1000 | **100±0.2** | 99±1 | 99±0.2 | — | 59±1 | 18±2 | 31±3 | 80±13 | 34±2 |
+| $n$/class | SPI-MPNN | Fixed-SPI | SGC-Only | Correlation | Latent | Shuffled | Node-Only |
+|---|---|---|---|---|---|---|---|
+| 20 | 57±22 | 72±12 | 61±9 | 35±5 | 30±2 | 34±4 | 33±2 |
+| 50 | 92±2 | 92±2 | 95±8 | 47±13 | 33±1 | 38±5 | 31±2 |
+| 100 | 97±2 | 98±1 | 83±17 | 57±2 | 32±2 | 37±3 | 31±3 |
+| 200 | 98±5 | 98±1 | 95±12 | 53±11 | 31±2 | 41±5 | 30±2 |
+| 500 | 98±4 | 99±0.5 | 87±24 | 59±1 | 31±2 | 55±19 | 32±3 |
+| 1000 | 100±0.2 | 99±1 | 96±11 | 59±1 | 31±3 | 80±13 | 34±2 |
 
-**[FIGURE 1 PLACEHOLDER]** *Sample efficiency curves (F1 vs n/class) for all 7 models. SPI-vocabulary models (SPI-MPNN, Fixed-SPI, MLP-Mix) occupy the top band; non-SPI baselines cluster near chance. Recommended: line plot with error bands, log-scale x-axis.*
+Additional ablations (not shown): TE-only (29–18%, chance), Top-3 oracle SPIs (67–100%, std up to 27%), MLP-Mix (63–99%), Edge-Ablation (35–88%). See findings below.
 
-**Interpretation.** Three findings emerge:
+**[FIGURE PLACEHOLDER]** *Sample efficiency curves (F1 vs n/class) with error bands, log-scale x-axis.*
 
-**(i) The SPI vocabulary is the dominant inductive bias — and diversity is essential.** All SPI-consuming models (SPI-MPNN, Fixed-SPI, MLP-Mix) dramatically outperform non-SPI baselines across all sample sizes. The gap is not marginal — it is the difference between near-perfect classification and chance performance. Critically, the TE-only ablation (29–18%, *below* chance) shows that even the theoretically correct *type* of statistic — a directed, causal measure — fails when used alone. Transfer entropy estimation from $T{=}500$ is too noisy for reliable per-instance graph construction; top-$d$ sparsification selects noise peaks over true causal edges. The vocabulary succeeds because it pools information across ~125 statistics with complementary bias-variance profiles, providing robustness that no single estimator can match.
+**Interpretation.**
+
+**(i) The SPI vocabulary is the dominant inductive bias — and diversity provides stability.** All SPI-consuming models (SPI-MPNN, Fixed-SPI, MLP-Mix) dramatically outperform non-SPI baselines. A vocabulary ablation ladder isolates why. TE-only (29–18%) uses a directed, causal statistic — the correct *type* — but the nonparametric Kraskov estimator at $T{=}500$ is too noisy for reliable per-instance graph construction. SGC-only (61–96%, std 8–24%), the oracle-best SPI from the learned $\mathbf{w}$ and a correctly specified parametric estimator for VAR(1), achieves high peak performance but with severe seed instability: 2/10 seeds catastrophically fail at $n{=}500$ (F1 $< 0.41$). The oracle top-3 SPIs (67–100%, std up to 27%) retain catastrophic failures at $n{=}500$. Only the full vocabulary (std 0.2–2% at $n \geq 50$, zero catastrophic failures) provides stable performance — the 125 SPIs function as a multi-view representation [Xu et al., 2013] whose diversity yields variance reduction via the bias-variance-covariance decomposition of complementary estimators [Krogh & Vedelsby, 1994; Brown et al., 2005]. The vocabulary's value is not solely in containing the right statistics but in providing *robustness through diversity*.
 
 **(ii) Symmetric construction is empirically limited, as predicted.** Correlation (59%) stays below the theoretical $2/3$ ceiling — top-$d$ sparsification of $|r_{ij}|$ discards motif edges in favour of high-correlation nuisance pairs. The latent model (31%) performs at chance, confirming that symmetric node-embedding construction with no statistical prior cannot access the chain/fork distinction. These results validate the Markov equivalence argument.
 
@@ -115,11 +119,11 @@ All five are directed temporal measures. For a VAR(1) process, causal structure 
 
 ## 5 Discussion
 
-**Positioning.** Graph structure learning methods — metric-based, neural, attention-based [Zhu et al., 2021] — universally use latent embeddings. CauGNN [Duan et al., 2023] and MTE-MTGNN [2025] construct graphs from a single pre-specified statistic (transfer entropy); ADLGNN [Sriramulu et al., 2023] initialises from statistics but overwrites with attention, losing interpretability. Our approach occupies an unoccupied point: a *vocabulary* of named statistics with *learnable per-statistic weights* that remain inspectable after training. Nguyen et al. [2025] argued that named statistical features capture interactions that raw-value methods miss — we operationalise this insight within a GNN framework.
+**Positioning.** Graph structure learning methods — metric-based, neural, attention-based [Zhu et al., 2021] — universally use latent embeddings. CauGNN [Duan et al., 2023] constructs graphs from a single pre-specified statistic (transfer entropy); ADLGNN [Sriramulu et al., 2023] initialises from statistics but overwrites with attention, losing interpretability. Our approach occupies an unoccupied point: a *vocabulary* of named statistics with *learnable per-statistic weights* that remain inspectable after training. Nguyen et al. [2025] argued that named statistical features capture interactions that raw-value methods miss — we operationalise this insight within a GNN framework.
 
 **Limitations.** (1) SPI computation is expensive ($O(K \cdot M^2)$ per sample); amortisable but limits scalability. (2) The vocabulary is a design choice — though group sparsity mitigates sensitivity. (3) All SPIs are bivariate; higher-order interactions require multi-hop message passing to compose. (4) The current study is synthetic; real-world validation (e.g., EEG motor imagery, fMRI) is needed to confirm that the learned statistical signature produces domain-interpretable findings.
 
-**Conclusion.** We have shown that a pre-specified vocabulary of heterogeneous pairwise statistics, integrated as a structured inductive bias for MPNN graph construction, enables near-perfect topology classification where symmetric and latent approaches fail. The learned weight vector identifies which statistical notion of coupling is task-relevant — a form of interpretability that latent graph learners structurally cannot offer.
+**Conclusion.** The statistical signature produced by the learned $\mathbf{w}$ — identifying spectral Granger causality as the dominant coupling mode — constitutes a testable hypothesis about the data-generating process, not merely a classification artefact. This is a form of scientific output that latent graph learners structurally cannot produce. On real-world MTS (EEG, fMRI, climate), the same mechanism would identify which notion of coupling — coherence, transfer entropy, Granger causality, or combinations thereof — is relevant to the task, yielding domain-interpretable graph structure directly from the learned parameters.
 
 ---
 
@@ -128,6 +132,8 @@ All five are directed temporal measures. For a VAR(1) process, causal structure 
 Alain, G. & Bengio, Y. (2017). Understanding intermediate layers using linear classifier probes. *ICLR Workshop*.
 
 Battaglia, P.W. et al. (2018). Relational inductive biases, deep learning, and graph networks. *arXiv:1806.01261*.
+
+Brown, G. et al. (2005). Diversity creation methods: A survey and categorisation. *Information Fusion*, 6(1), 5–20.
 
 Bullmore, E. & Sporns, O. (2009). Complex brain networks. *Nature Reviews Neuroscience*, 10(3), 186–198.
 
@@ -142,6 +148,8 @@ Gilmer, J. et al. (2017). Neural message passing for quantum chemistry. *ICML*.
 Granger, C.W.J. (1969). Investigating causal relations by econometric models and cross-spectral methods. *Econometrica*, 37(3), 424–438.
 
 Kipf, T. et al. (2018). Neural relational inference for interacting systems. *ICML*.
+
+Krogh, A. & Vedelsby, J. (1994). Neural network ensembles, cross validation, and active learning. *NeurIPS*, 7.
 
 Li, Y. et al. (2018). Diffusion convolutional recurrent neural network. *ICLR*.
 
@@ -164,6 +172,8 @@ Verma, T.S. & Pearl, J. (1990). Equivalence and synthesis of causal models. *UAI
 Wu, Z. et al. (2019). Graph WaveNet for deep spatial-temporal graph modeling. *IJCAI*.
 
 Wu, Z. et al. (2020). Connecting the dots: Multivariate time series forecasting with graph neural networks. *KDD*.
+
+Xu, C. et al. (2013). A survey on multi-view learning. *arXiv:1304.5634*.
 
 Xu, K. et al. (2019). How powerful are graph neural networks? *ICLR*.
 
