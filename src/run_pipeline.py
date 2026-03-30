@@ -142,7 +142,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     # Architecture
     p.add_argument("--hidden", type=int, default=64)
     p.add_argument("--n-layers", type=int, default=2)
-    p.add_argument("--top-d", type=int, default=3)
+    p.add_argument("--top-d", type=int, default=5)
     p.add_argument("--embed-dim", type=int, default=8,
                    help="Node embed dim for latent baseline (approx K/n_node_feat)")
     p.add_argument("--dropout", type=float, default=0.1)
@@ -155,14 +155,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--no-cosine-decay", action="store_true")
     # Regularisation
-    p.add_argument("--l1-lambda", type=float, default=0.0)
-    p.add_argument("--group-lambda", type=float, default=0.0)
+    p.add_argument("--l1-lambda", type=float, default=0.001)
+    p.add_argument("--group-lambda", type=float, default=0.02)
     # Optimisation stability
-    p.add_argument("--warmup-epochs", type=int, default=0,
+    p.add_argument("--warmup-epochs", type=int, default=60,
                    help="Linear LR warmup epochs before cosine decay")
     p.add_argument("--w-lr-mult", type=float, default=1.0,
                    help="LR multiplier for spi_w/spi_b parameters")
-    p.add_argument("--restarts", type=int, default=1,
+    p.add_argument("--restarts", type=int, default=2,
                    help="Train N times per seed, keep best by val F1")
     # Output
     p.add_argument("--output-dir", default=None)
@@ -174,6 +174,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--subset-spi", nargs="+", default=None,
                    help="SPI name prefixes for subset-spi model (e.g. 'sgc_parametric_mean' "
                         "'gc_gaussian'). Each prefix matches the first retained SPI.")
+    p.add_argument("--instance-range", type=int, nargs=2, default=None,
+                   metavar=("START", "END"),
+                   help="Only load instances with index in [START, END] (inclusive). "
+                        "Useful for per-subject runs when subjects are blocked by index.")
     return p.parse_args(argv)
 
 
@@ -181,8 +185,21 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 # Data loading
 # ---------------------------------------------------------------------------
 
+def _extract_instance_index(path: Path) -> int | None:
+    """Extract the integer instance index from a directory name like 'classfeet_I42'."""
+    name = path.name
+    if "_I" in name:
+        try:
+            return int(name.rsplit("_I", 1)[1])
+        except ValueError:
+            pass
+    return None
+
+
 def _discover_datasets(
-    data_dir: Path, class_names: list[str]
+    data_dir: Path,
+    class_names: list[str],
+    instance_range: tuple[int, int] | None = None,
 ) -> dict[str, list[Path]]:
     result: dict[str, list[Path]] = {}
     for name in class_names:
@@ -197,6 +214,13 @@ def _discover_datasets(
             and (d / "timeseries.npy").exists()
             and (d / "meta.json").exists()
         )
+        if instance_range is not None:
+            lo, hi = instance_range
+            dirs = [
+                d for d in dirs
+                if (idx := _extract_instance_index(d)) is not None
+                and lo <= idx <= hi
+            ]
         if dirs:
             result[name] = dirs
         else:
@@ -366,7 +390,7 @@ def _run_standard(args: argparse.Namespace, data_dir: Path, output_dir: Path) ->
     print(f"Mode: standard  |  Classes: {class_names}")
     print(f"{'='*70}")
 
-    datasets_by_class = _discover_datasets(data_dir, class_names)
+    datasets_by_class = _discover_datasets(data_dir, class_names, args.instance_range)
     if not datasets_by_class:
         print("[ERROR] No data found"); return
 
@@ -503,7 +527,7 @@ def _run_sample_efficiency(
     print(f"n_train values: {n_train_values}  |  val/class: {n_val}  |  test/class: {n_test}")
     print(f"{'='*70}")
 
-    datasets_by_class = _discover_datasets(data_dir, class_names)
+    datasets_by_class = _discover_datasets(data_dir, class_names, args.instance_range)
     if not datasets_by_class:
         print("[ERROR] No data found"); return
 
