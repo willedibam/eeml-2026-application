@@ -7,15 +7,24 @@
 \usepackage{hyperref}
 \newcommand{\theHalgorithm}{\arabic{algorithm}}
 \usepackage[accepted]{icml2025}
+
+\makeatletter
+\renewcommand{\Notice@String}{}
+\makeatother
+
 \usepackage[
   letterpaper,
   left=0.75in,
   right=0.75in,
-  top=1.0in,
-  bottom=1.0in,
-  headheight=10pt,
-  headsep=10pt
+  top=0.75in,
+  bottom=0.75in,
+  headheight=20pt,
 ]{geometry}
+
+% \setlength{\footskip}{14pt}   % try 14pt–18pt
+% \setlength{\skip\footins}{0pt} % optional, slightly tighter footnote gap
+% \raggedbottom                  % optional
+
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{mathtools}
@@ -26,21 +35,22 @@
 \twocolumn[
 \icmltitle{Graph Construction from a Statistical Vocabulary}
 
-\icmlsetsymbol{equal}{*}
-
 \begin{icmlauthorlist}
 \icmlauthor{Will Edibam}{usyd,dns}
 \icmlauthor{Ben Fulcher}{usyd,dns}
 \end{icmlauthorlist}
 
-\icmlaffiliation{usyd}{The University of Sydney, Australia}
+\icmlaffiliation{usyd}{The University of Sydney, New South Wales, Australia}
 \icmlaffiliation{dns}{Dynamics and Neural Systems Group}
+\icmlcorrespondingauthor{Will Edibam}{will.edibam@sydney.edu.au}
 
 \vskip 0.3in
 ]
 
+\printAffiliationsAndNotice{}
+
 \begin{abstract}
-This extended abstract presents work in preparation that applies our group's \texttt{pyspi} framework \citep{cliff2023} to the problem of graph construction for graph neural networks on multivariate time series. Graph construction is the critical upstream design variable in these pipelines, yet existing methods either commit to a single pairwise statistic or learn edges from latent embeddings with no statistical semantics. We parameterise construction over a vocabulary of $K {\approx} 125$ named pairwise statistics --- causal, spectral, linear, information-theoretic --- and jointly learn which are task-relevant. On synthetic topology classification, vocabulary-based models achieve $100\%$ macro F1 where symmetric baselines plateau at $59\%$ and latent baselines remain at chance. The learned weight vector recovers spectral Granger causality as the dominant coupling mode --- an interpretable statistical signature that latent methods structurally cannot produce.
+This extended abstract presents work in preparation that applies our group's \texttt{pyspi} framework \citep{cliff2023} to the problem of graph construction for graph neural networks on multivariate time series. Graph construction is the critical upstream design variable in these pipelines, yet existing methods either commit to a single pairwise statistic or learn edges from latent embeddings with no statistical semantics. We parameterise construction over a vocabulary of $K {\approx} 125$ named pairwise statistics --- causal, spectral, linear, information-theoretic --- and jointly learn which are task-relevant, yielding an interpretable statistical signature that latent models structurally cannot reproduce.. On synthetic topology classification, vocabulary-based models achieve $100\%$ macro F1 where symmetric baselines plateau at $59\%$ and latent baselines remain at chance. The learned weight vector $\mathbf{w}$ recovers spectral Granger causality as the dominant coupling mode --- an interpretable statistical signature that latent methods structurally cannot produce.
 \end{abstract}
 
 %-----------------------------------------------------------------------
@@ -50,7 +60,17 @@ This extended abstract presents work in preparation that applies our group's \te
 
 Message-passing neural networks (MPNNs) propagate information along relational structure \citep{gilmer2017,battaglia2018}. For multivariate time series (MTS), this structure is unobserved and must be constructed from data. The construction choice is the critical design variable: \citet{qi2025} showed that message-passing \emph{consistently degrades} when graph construction is naive, and \citet{liu2025} found substantial variation across 239 pairwise statistics benchmarked on the same neuroimaging data. Yet in every existing GNN pipeline, this choice is made once by the practitioner, before learning begins.
 
-Current practice follows two regimes, both with fundamental limitations. Fixing the graph from a single statistic --- Pearson correlation \citep{bullmore2009}, transfer entropy \citep{duan2023} --- commits to one notion of dependence; if the task-relevant coupling is directed, nonlinear, or frequency-specific, the operator becomes the bottleneck. Learning the graph from latent embeddings \citep{kipf2018,wu2019,wu2020} recovers flexibility but sacrifices semantics: even NRI's discrete edge types \citep{kipf2018}, the most semantically structured latent approach, are learned categories with no pre-specified statistical meaning, and attention-based methods \citep{sriramulu2023} that initialise from statistics overwrite them during training. In scientific domains where the graph is the object of study --- neuroscience, climate, genomics --- this absence of statistical semantics is a fundamental limitation.
+% === FIGURE 1 (must be on page 1 so it appears at top of page 2) ===
+\begin{figure*}[t!]
+\begin{center}
+\includegraphics[width=0.85\textwidth]{images/fig1_composite.pdf}
+\caption{(a)~Vocabulary-based models reach near-perfect F1 from $n{=}100$ while Correlation plateaus below the $2/3$ ceiling and Latent remains at chance. Red dashed: $1/3$ chance; grey dotted: $2/3$ symmetric ceiling. (b)~Family $L_2$ norms of learned $\mathbf{w}$ at $n{=}500$: the causal family dominates, with individual dot weights revealing spectral Granger causality as the top-weighted statistic.}
+\label{fig:main}
+\end{center}
+\vskip -0.2in
+\end{figure*}
+
+Current practice follows two regimes, both with fundamental limitations. Fixing the graph from a single statistic --- Pearson correlation for functional connectivity \citep{bullmore2009}, transfer entropy for causal graphs \citep{duan2023}, , spatial distance for traffic \citep{li2018dcrnn}, --- commits to one notion of dependence; if the task-relevant coupling is directed, nonlinear, or frequency-specific, the operator becomes the bottleneck. Learning the graph from latent embeddings \citep{kipf2018,wu2019,wu2020} recovers flexibility but sacrifices semantics: even NRI's discrete edge types \citep{kipf2018}, the most semantically structured latent approach, are learned categories with no pre-specified statistical meaning, and attention-based methods \citep{sriramulu2023} that initialise from statistics overwrite them during training. In scientific domains where the graph is the object of study --- neuroscience, climate, genomics --- this absence of statistical semantics is a fundamental limitation.
 
 A concrete instance of why the choice matters: consider three VAR(1) motifs --- chain ($A {\to} B {\to} C$), fork ($A {\leftarrow} B {\to} C$), collider ($A {\to} B {\leftarrow} C$). Chain and fork are Markov-equivalent \citep{verma1990}: they share the same skeleton and v-structures, so any symmetric statistic assigns them identical edge weights regardless of sample size. No MPNN on such a graph can exceed $2/3$ accuracy on the three-class problem. Directed statistics --- where $f(X_i, X_j) \neq f(X_j, X_i)$ --- break this equivalence.
 
@@ -98,19 +118,6 @@ The vocabulary thus plays a dual role: it determines \emph{which edges exist} (v
 
 \textbf{Setup.} $M{=}10$ node VAR(1) processes ($T{=}500$) with one of three directed motifs (chain, fork, collider) embedded among 7 nuisance AR(1) channels. Coupling $\alpha \sim U(0.3, 0.7)$; 1500 instances/class; $K{=}125$ after filtering; 30 random seeds. This is a controlled test of the theory: chain and fork produce \emph{identical} symmetric pairwise statistics.
 
-% === FIGURE 1 ===
-\begin{figure*}[t]
-\vskip 0.1in
-\begin{center}
-\subfigure[Sample efficiency]{\includegraphics[width=0.62\textwidth]{figures/fig2a_sample_efficiency.pdf}\label{fig:efficiency}}
-\hfill
-\subfigure[Statistical signature]{\includegraphics[width=0.35\textwidth]{figures/fig1c_family_violin.pdf}\label{fig:signature}}
-\caption{(a)~Vocabulary-based models reach near-perfect F1 from $n{=}100$ while Correlation plateaus below the $2/3$ ceiling and Latent remains at chance. Red dashed: $1/3$ chance; grey dotted: $2/3$ symmetric ceiling. (b)~Family $L_2$ norms of learned $\mathbf{w}$ at $n{=}500$: the causal family dominates, with individual dot weights revealing spectral Granger causality as the top-weighted statistic.}
-\label{fig:main}
-\end{center}
-\vskip -0.2in
-\end{figure*}
-
 \begin{table}[ht]
 \caption{Macro F1 (\%, 30 seeds, $\pm$1 s.d.).}
 \label{tab:main}
@@ -137,9 +144,9 @@ $n$/cls & SPI & Fixed & E-Abl. & Corr. & Latent & Node \\
 
 \textbf{Symmetric baselines confirm the theory.} Correlation never exceeds 59\%, well below the $2/3$ Markov-equivalence ceiling. The latent model \citep[cf.][]{wu2019} remains at chance (31--32\%) across all sample sizes --- node-level embeddings without statistical priors cannot access the chain--fork distinction. These are expressiveness limitations of symmetric graph construction, exactly as predicted.
 
-\textbf{An interpretable statistical signature.} Under group lasso, the causal family (48 SPIs) carries ${\sim}3.5{\times}$ the $L_2$ norm of the next family (\cref{fig:main}b). The five highest-weighted individual SPIs are all spectral and time-domain Granger causality variants in the 0.25--0.5\,Hz band --- matching the generating process's causal structure \citep{geweke1982}. An edge-ablation study (same topology, zeroed edge features) drops F1 to 93$\pm$11\%, confirming the MPNN uses the statistical content of edges, not merely the topology (full ablation results in Appendix~\ref{app:ablation}).
+\textbf{An interpretable statistical signature.} Under group lasso, the causal family (48 SPIs) carries ${\sim}3.5{\times}$ the $L_2$ norm of the next family (\cref{fig:main}b). The five highest-weighted individual SPIs are all spectral and time-domain Granger causality variants in the 0.25--0.5\,Hz band, matching the generating process's causal structure \citep{geweke1982}. An edge-ablation study (same topology, zeroed edge features) drops F1 to 93$\pm$11\%, confirming the MPNN uses the statistical content of edges, not merely the topology (full ablation results in Appendix~\ref{app:ablation}).
 
-This is the form of output that latent graph learners cannot produce: \emph{``the relational structure in this task is best captured by spectral Granger causality in the 0.25--0.5\,Hz band.''} On real-world MTS, the same mechanism would identify which notion of coupling --- coherence, transfer entropy, or combinations thereof --- is relevant to the domain. Validation on clinical EEG is underway.
+This is the form of output that latent graph learners structurally cannot produce: a named, falsifiable claim --- \emph{``spectral Granger causality in the 0.25--0.5\,Hz band is the dominant coupling mode''} --- derived end-to-end from data. The natural next step is clinical EEG, where the question shifts from ``can we recover known causal structure?'' to ``what form of inter-channel dependence predicts seizure onset?'' We are awaiting access approval for the TUH EEG Corpus to test exactly this.
 
 \bibliography{references}
 \bibliographystyle{icml2025}
@@ -178,6 +185,7 @@ $n$/cls & SPI & Fixed & Mix & SGC & E-Abl. & Corr. & Lat. & Shuf. & Node \\
 \vskip 0.1in
 \textit{Note: SGC-Only entries at $n{=}500$ and $n{=}1000$ are pending.}
 \end{table}
+
 
 The progression from single statistic to full vocabulary isolates the source of the method's advantage.
 

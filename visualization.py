@@ -84,10 +84,10 @@ MODEL_LINESTYLES = {
     "fixed-spi": "-",
     "mlp-mix": "-",
     "edge-ablation": "--",
-    "correlation": "--",
-    "latent": "--",
-    "shuffled": ":",
-    "node-only": ":",
+    "correlation": "-",
+    "latent": "-",
+    "shuffled": "-",
+    "node-only": "-",
 }
 
 FAMILY_COLORS = {
@@ -138,7 +138,7 @@ def plot_motif_graph(
     Motif nodes (A, B, C) at top of ring; nuisance nodes form the rest.
     """
     if ax is None:
-        fig, ax = plt.subplots(1, 1, figsize=figsize)
+        fig, ax = plt.subplots(1, 1, figsize=figsize, dpi=500)
     else:
         fig = ax.figure
 
@@ -230,7 +230,7 @@ def plot_time_series(
         (T,) or (T, M) array, or path to .npy file.
     """
     if ax is None:
-        fig, ax = plt.subplots(1, 1, figsize=figsize)
+        fig, ax = plt.subplots(1, 1, figsize=figsize, dpi=500)
     else:
         fig = ax.figure
 
@@ -273,7 +273,7 @@ def plot_mts_heatmap(
     Uses icefire colormap (perceptually uniform diverging).
     """
     if ax is None:
-        fig, ax = plt.subplots(1, 1, figsize=figsize)
+        fig, ax = plt.subplots(1, 1, figsize=figsize, dpi=500)
     else:
         fig = ax.figure
 
@@ -321,7 +321,7 @@ def plot_mpi_heatmap(
     sequential for symmetric ones.
     """
     if ax is None:
-        fig, ax = plt.subplots(1, 1, figsize=figsize)
+        fig, ax = plt.subplots(1, 1, figsize=figsize, dpi=500)
     else:
         fig = ax.figure
 
@@ -350,6 +350,8 @@ def plot_mpi_heatmap(
 
     ax.set_xticks([])
     ax.set_yticks([])
+    for spine in ax.spines.values():
+        spine.set_visible(False)
 
     label = title if title else spi_name
     sym_tag = "directed" if is_asymmetric else "symmetric"
@@ -419,6 +421,7 @@ def plot_sample_efficiency(
     models: list[str] | None = None,
     ax: Optional[plt.Axes] = None,
     figsize: tuple = (5.5, 3.5),
+    dpi: int = 500,
     show_chance: bool = True,
     show_symmetric_ceiling: bool = True,
     metric: str = "f1",
@@ -436,7 +439,7 @@ def plot_sample_efficiency(
         Show light grid lines (default True).
     """
     if ax is None:
-        fig, ax = plt.subplots(1, 1, figsize=figsize)
+        fig, ax = plt.subplots(1, 1, figsize=figsize, dpi=dpi)
     else:
         fig = ax.figure
 
@@ -473,7 +476,7 @@ def plot_sample_efficiency(
         means, stds = np.array(means), np.array(stds)
 
         ax.plot(ns, means, color=color, marker=marker, label=label,
-                linestyle=ls, linewidth=1.5, markersize=4, zorder=3)
+                linestyle=ls, linewidth=0.8, markersize=3, zorder=3, alpha=0.7)
 
         if band_mode == "std":
             lo = means - stds
@@ -490,28 +493,35 @@ def plot_sample_efficiency(
             lo = means - stds
             hi = np.minimum(means + stds, 1.0)
 
-        ax.fill_between(ns, lo, hi, color=color, alpha=0.12, zorder=2)
-
-    if show_chance:
-        ax.axhline(1 / 3, color="#D32F2F", linestyle="--", linewidth=1.2,
-                    zorder=1, label="Chance (1/3)")
-    if show_symmetric_ceiling:
-        ax.axhline(2 / 3, color="#9E9E9E", linestyle=":", linewidth=0.8,
-                    zorder=1, label="Symmetric ceiling (2/3)")
+        ax.fill_between(ns, lo, hi, color=color, alpha=0.1, zorder=2)
 
     ax.set_xscale("log")
     ax.set_xticks(n_values)
-    ax.grid(True, which="both", linestyle="--", axis="both", alpha=0.4, linewidth=0.5)
     ax.get_xaxis().set_major_formatter(ticker.ScalarFormatter())
     ax.set_xlabel(r"Training samples per class ($n$)")
     ax.set_ylabel("Macro F1")
     ax.set_ylim(0.0, 1.05)
+
+    if show_chance:
+        ax.axhline(1 / 3, color="#D32F2F", linestyle="--", linewidth=0.5,
+                    zorder=1, alpha=0.8)
+        ax.annotate(
+            "chance", xy=(0, 1 / 3), xycoords=("axes fraction", "data"),
+            xytext=(-4, 0), textcoords="offset points",
+            ha="right", va="center", fontsize=5.5, color="#D32F2F",
+        )
+    if show_symmetric_ceiling:
+        ax.axhline(2 / 3, color="#12345DC9", linestyle=":", linewidth=0.6,
+                    zorder=1)
+        ax.annotate(
+            "sym. ceiling", xy=(0, 2 / 3), xycoords=("axes fraction", "data"),
+            xytext=(-4, 0), textcoords="offset points",
+            ha="right", va="center", fontsize=5.5, color="#12345DC9",
+        )
+
     ax.legend(
         loc="lower right", framealpha=0.2, ncol=3,
-        fontsize=4, 
-        # handlelength=1.2, handletextpad=0.3,
-        # columnspacing=0.6, borderpad=0.3, 
-        markerscale=0.7,
+        fontsize=5, markerscale=0.7,
     )
 
     if grid:
@@ -536,7 +546,7 @@ def plot_sample_efficiency_multi(
     results_paths: {model_name: path} — each file contributes one model's data.
     """
     if ax is None:
-        fig, ax = plt.subplots(1, 1, figsize=figsize)
+        fig, ax = plt.subplots(1, 1, figsize=figsize, dpi=500)
     else:
         fig = ax.figure
 
@@ -614,7 +624,7 @@ def plot_family_weights(
     (e.g., SGC, TE).
     """
     if ax is None:
-        fig, ax = plt.subplots(1, 1, figsize=figsize)
+        fig, ax = plt.subplots(1, 1, figsize=figsize, dpi=500)
     else:
         fig = ax.figure
 
@@ -669,7 +679,7 @@ def plot_family_weights(
 
     # Label top-k SPIs with staggered vertical offsets to avoid overlap
     top_spis = df.nlargest(top_k_labels, r"$|w|$")
-    y_offsets = [-14, 10, -22]
+    y_offsets = [-7, 10, -12]
     for i, (_, row) in enumerate(top_spis.iterrows()):
         family_idx = family_order.index(row["Family"])
         short_name = _short_spi_name(row["SPI"])
@@ -681,9 +691,9 @@ def plot_family_weights(
             arrowprops=dict(arrowstyle="-", color="#aaa", lw=0.3),
         )
 
-    ax.set_xlabel(r"Mean $|w_k|$ across seeds")
+    ax.set_xlabel(r"Mean $|\mathbf{w}_k|$ ($n=30$ seeds)", fontsize=7)
     ax.set_ylabel("")
-    ax.set_title(rf"Statistical signature ($n$={n_value})", fontsize=8)
+    ax.set_title(rf"Statistical signature by SPI family ($n$={n_value})", fontsize=8)
 
     return fig, ax
 
@@ -711,7 +721,7 @@ def plot_per_seed_strip(
         E.g., {"spi-mpnn": 0.9} removes SPI-MPNN seeds with F1 < 0.9.
     """
     if ax is None:
-        fig, ax = plt.subplots(1, 1, figsize=figsize)
+        fig, ax = plt.subplots(1, 1, figsize=figsize,dpi=500)
     else:
         fig = ax.figure
 
@@ -764,6 +774,195 @@ def plot_per_seed_strip(
     ax.set_title(rf"Per-seed performance ($n$={n_value})", fontsize=8)
 
     return fig, ax
+
+
+# ---------------------------------------------------------------------------
+# Pipeline schematic components
+# ---------------------------------------------------------------------------
+
+def plot_edge_descriptor(
+    npz_path: str | Path,
+    i: int = 0,
+    j: int = 1,
+    *,
+    results_path: str | Path | None = None,
+    n_value: int = 500,
+    ax: Optional[plt.Axes] = None,
+    figsize: tuple = (1, 3.0),
+    cmap: str = "coolwarm",
+    show_w: bool = True,
+    show_e: bool = True,
+    show_families: bool = True,
+) -> tuple[plt.Figure, plt.Axes]:
+    """
+    Vertical strip visualising the edge descriptor E_ij and (optionally)
+    learned w, grouped by SPI family.
+
+    Designed as a data panel for a pipeline schematic figure.
+
+    Parameters
+    ----------
+    npz_path : path to spi_mpis.npz (one instance)
+    i, j : node pair for the descriptor
+    results_path : if given (and show_w), overlay learned |w| as a second column
+    n_value : sample size for extracting learned w
+    show_w : show the learned w column alongside E_ij
+    show_families : annotate family boundaries and labels
+    """
+    if ax is not None:
+        fig = ax.figure
+        # When given an axes, ignore show_w — single column only
+        show_w = False
+    else:
+        fig = None
+
+    # --- Load SPI names and family mapping from results JSON ---
+    spi_names_filtered = None
+    family_order_map = {}  # spi_name -> family
+    family_indices = {}    # family -> [indices into filtered list]
+    w_mean = None
+
+    if results_path is not None:
+        data = load_results(results_path)
+        spi_names_filtered = data["spi_names"]
+        spi_families_dict = data.get("spi_families", {})
+        for fam, indices in spi_families_dict.items():
+            family_indices[fam] = indices
+            for idx in indices:
+                family_order_map[idx] = fam
+
+        if show_w:
+            n_str = str(n_value)
+            per_seed = data["results"][n_str]["models"]["spi-mpnn"]["per_seed"]
+            w_matrix = np.array([s["learned_w"] for s in per_seed])
+            w_mean = w_matrix.mean(axis=0)
+
+    # --- Load E_ij from npz ---
+    with np.load(npz_path) as npz:
+        all_spi_names = sorted(npz.files)
+        all_matrices = {k: npz[k] for k in all_spi_names}
+
+    # Filter to the SPIs used in training (if results available)
+    if spi_names_filtered is not None:
+        filtered_set = set(spi_names_filtered)
+        spi_names = [k for k in all_spi_names if k in filtered_set]
+        # Reorder to match results JSON ordering
+        name_to_idx = {n: idx for idx, n in enumerate(spi_names_filtered)}
+        spi_names = sorted(spi_names, key=lambda n: name_to_idx.get(n, 999))
+    else:
+        spi_names = all_spi_names
+
+    K = len(spi_names)
+    E_ij = np.array([all_matrices[k][i, j] for k in spi_names])
+
+    # --- Sort by family for visual grouping ---
+    FAMILY_ORDER = ["causal", "spectral", "linear", "information", "distance", "rank"]
+
+    if spi_names_filtered is not None and family_indices:
+        # Build display order: grouped by family
+        name_to_filtered_idx = {n: idx for idx, n in enumerate(spi_names_filtered)}
+        ordered_indices = []
+        family_boundaries = []  # (start, end, name)
+        for fam in FAMILY_ORDER:
+            if fam not in family_indices:
+                continue
+            start = len(ordered_indices)
+            fam_idxs = [idx for idx in family_indices[fam]
+                        if idx < len(spi_names_filtered)]
+            ordered_indices.extend(fam_idxs)
+            family_boundaries.append((start, len(ordered_indices), fam))
+
+        E_ij_sorted = E_ij[ordered_indices]
+        w_sorted = w_mean[ordered_indices] if w_mean is not None else None
+    else:
+        E_ij_sorted = E_ij
+        w_sorted = w_mean
+        family_boundaries = [(0, K, "all")]
+
+    K_disp = len(E_ij_sorted)
+
+    # --- Create figure ---
+    has_w = show_w and w_sorted is not None
+    cols = []
+    ratios = []
+    if show_e:
+        cols.append("e")
+        ratios.append(3)
+    if has_w:
+        cols.append("w")
+        ratios.append(2)
+    n_cols = len(cols)
+    if n_cols == 0:
+        raise ValueError("At least one of show_e or show_w must be True")
+
+    if fig is None:
+        width = figsize[0] * (1.4 if n_cols == 2 else 1.0)
+        fig, axes = plt.subplots(
+            1, n_cols, figsize=(width, figsize[1]),
+            gridspec_kw={"width_ratios": ratios, "wspace": 0.08},
+            squeeze=False,
+        )
+        axes = axes[0]
+    else:
+        axes = [ax]
+
+    col_map = {name: axes[idx] for idx, name in enumerate(cols)}
+
+    # --- E_ij column ---
+    if show_e:
+        vmax_e = np.percentile(np.abs(E_ij_sorted), 98)
+        E_display = E_ij_sorted.reshape(K_disp, 1)
+
+        ax_e = col_map["e"]
+        ax_e.imshow(
+            E_display, aspect="auto",
+            cmap=cmap, vmin=-vmax_e, vmax=vmax_e,
+            interpolation="nearest",
+        )
+        ax_e.set_xlim(0, 1)
+        ax_e.set_ylim(K_disp, 0)
+        ax_e.set_xticks([])
+        ax_e.set_yticks([])
+        for spine in ax_e.spines.values():
+            spine.set_visible(False)
+        ax_e.set_title(rf"$\mathbf{{E}}_{{{i}{j}}}$", fontsize=8, pad=4)
+
+    # --- Family annotations (on leftmost column) ---
+    ax_fam = col_map.get("e", col_map.get("w"))
+    if show_families and len(family_boundaries) > 1:
+        for start, end, fam in family_boundaries:
+            mid = (start + end) / 2
+            color = FAMILY_COLORS.get(fam, "#999")
+            ax_fam.plot(
+                [-0.15, -0.15], [start + 0.2, end - 0.2],
+                color=color, linewidth=2.0, clip_on=False,
+                solid_capstyle="butt",
+            )
+            ax_fam.text(
+                -0.25, mid, fam[:4] + ".",
+                ha="right", va="center", fontsize=5, color=color,
+                fontweight="bold", rotation=0,
+            )
+
+    # --- w column ---
+    if has_w:
+        ax_w = col_map["w"]
+        vmax_w = np.max(np.abs(w_sorted)) * 1.1
+        W_display = w_sorted.reshape(K_disp, 1)
+        ax_w.imshow(
+            W_display, aspect="auto",
+            cmap=cmap, vmin=-vmax_w, vmax=vmax_w,
+            interpolation="nearest",
+        )
+        ax_w.set_xlim(0, 1)
+        ax_w.set_ylim(K_disp, 0)
+        ax_w.set_xticks([])
+        ax_w.set_yticks([])
+        for spine in ax_w.spines.values():
+            spine.set_visible(False)
+        ax_w.set_title(r"$\mathbf{w}$", fontsize=8, pad=4)
+
+    return fig, axes[0]
 
 
 # ---------------------------------------------------------------------------
