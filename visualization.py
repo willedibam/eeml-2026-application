@@ -112,9 +112,13 @@ def apply_style():
 # ---------------------------------------------------------------------------
 
 # Motif definitions: (edge_list, motif_node_indices)
+# Edges use paper convention: A=0, B=1, C=2.
+#   Chain:    A→B→C
+#   Fork:     A←B→C  (B is common cause)
+#   Collider: A→B←C  (B is common target)
 MOTIFS = {
     "Chain": ([(0, 1), (1, 2)], [0, 1, 2]),
-    "Fork": ([(1, 0), (2, 0)], [0, 1, 2]),
+    "Fork": ([(1, 0), (1, 2)], [0, 1, 2]),
     "Collider": ([(0, 1), (2, 1)], [0, 1, 2]),
 }
 
@@ -125,10 +129,13 @@ def plot_motif_graph(
     *,
     ax: Optional[plt.Axes] = None,
     figsize: tuple = (2.0, 2.0),
+    motif_color: str = "#1565C0",
+    nuisance_color: str = "#E0E0E0",
+    ring_edge_color: str = "#EEEEEE",
 ) -> tuple[plt.Figure, plt.Axes]:
     """
-    Draw a directed motif graph with M nodes.
-    3 motif nodes in A-B-C linear layout; nuisance nodes in outer ring.
+    Draw a directed motif graph with M nodes in a consistent ring layout.
+    Motif nodes (A, B, C) at top of ring; nuisance nodes form the rest.
     """
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=figsize)
@@ -141,55 +148,64 @@ def plot_motif_graph(
     G.add_nodes_from(range(M))
     G.add_edges_from(edges)
 
-    # Layout: motif nodes in a horizontal line (A-B-C)
+    # Ring layout: all M nodes evenly spaced on a circle.
+    # Motif nodes spread to ring positions 0, 4, 7 (top, bottom-right,
+    # bottom-left triangle) so directed arrows cross the ring interior
+    # and are clearly visible.
+    radius = 0.75
     pos = {}
-    motif_positions = [(-0.35, 0.0), (0.0, 0.0), (0.35, 0.0)]
-    for i, node in enumerate(motif_nodes):
-        pos[node] = motif_positions[i]
-
-    # Nuisance nodes in outer ring with faint dotted inter-connections
+    angle_step = 2 * np.pi / M
+    motif_ring_positions = [0, 4, 7]  # A at top, B at ~5 o'clock, C at ~10 o'clock
     nuisance = [n for n in range(M) if n not in motif_nodes]
-    for i, node in enumerate(nuisance):
-        angle = 2 * np.pi * i / len(nuisance) - np.pi / 2
-        pos[node] = (0.7 * np.cos(angle), 0.7 * np.sin(angle))
+    nuisance_ring_positions = [p for p in range(M) if p not in motif_ring_positions]
 
-    # Draw faint dotted edges between nuisance nodes (visual only)
-    if len(nuisance) > 1:
-        nuisance_edges = []
-        for i in range(len(nuisance)):
-            for j in range(i + 1, len(nuisance)):
-                nuisance_edges.append((nuisance[i], nuisance[j]))
-        nx.draw_networkx_edges(
-            G.to_undirected(), pos, edgelist=nuisance_edges,
-            edge_color="#E0E0E0", width=0.3, style="dotted", ax=ax,
-        )
+    for node, rp in zip(motif_nodes, motif_ring_positions):
+        angle = np.pi / 2 - rp * angle_step
+        pos[node] = (radius * np.cos(angle), radius * np.sin(angle))
+    for node, rp in zip(nuisance, nuisance_ring_positions):
+        angle = np.pi / 2 - rp * angle_step
+        pos[node] = (radius * np.cos(angle), radius * np.sin(angle))
 
-    # Draw nuisance nodes
-    nx.draw_networkx_nodes(
-        G, pos, nodelist=nuisance, node_color="#E0E0E0",
-        node_size=120, edgecolors="#BDBDBD", linewidths=0.5, ax=ax,
-    )
-    # Draw motif nodes
-    nx.draw_networkx_nodes(
-        G, pos, nodelist=motif_nodes, node_color="#1565C0",
-        node_size=200, edgecolors="#0D47A1", linewidths=1.0, ax=ax,
-    )
-    # Draw motif edges
+    # Faint ring edges between consecutive ring positions (structural cue)
+    all_ring_nodes = [None] * M
+    for node, rp in zip(motif_nodes, motif_ring_positions):
+        all_ring_nodes[rp] = node
+    for node, rp in zip(nuisance, nuisance_ring_positions):
+        all_ring_nodes[rp] = node
+    ring_edges = [(all_ring_nodes[i], all_ring_nodes[(i + 1) % M]) for i in range(M)]
     nx.draw_networkx_edges(
-        G, pos, edgelist=edges, edge_color="#1565C0",
-        width=2.0, arrows=True, arrowsize=12,
-        connectionstyle="arc3,rad=0.1", ax=ax,
+        G.to_undirected(), pos, edgelist=ring_edges,
+        edge_color=ring_edge_color, width=0.5, style="-", ax=ax,
     )
-    # Labels on motif nodes: A, B, C
+
+    # Nuisance nodes
+    nx.draw_networkx_nodes(
+        G, pos, nodelist=nuisance, node_color=nuisance_color,
+        node_size=100, edgecolors="#BDBDBD", linewidths=0.4, ax=ax,
+    )
+    # Motif nodes (larger, bold)
+    nx.draw_networkx_nodes(
+        G, pos, nodelist=motif_nodes, node_color=motif_color,
+        node_size=280, edgecolors="#0D47A1", linewidths=1.2, ax=ax,
+    )
+    # Motif edges — bold directed arrows crossing ring interior
+    nx.draw_networkx_edges(
+        G, pos, edgelist=edges, edge_color=motif_color,
+        width=2.0, arrows=True, arrowsize=15,
+        arrowstyle="-|>",
+        connectionstyle="arc3,rad=0.12", ax=ax,
+        min_source_margin=14, min_target_margin=14,
+    )
+    # Labels: A, B, C on motif nodes
     motif_labels = {n: MOTIF_NODE_LABELS[i] for i, n in enumerate(motif_nodes)}
     nx.draw_networkx_labels(
-        G, pos, labels=motif_labels, font_size=7,
+        G, pos, labels=motif_labels, font_size=8,
         font_color="white", font_weight="bold", ax=ax,
     )
 
     ax.set_title(motif_name, fontsize=9, fontweight="bold", pad=4)
-    ax.set_xlim(-1.0, 1.0)
-    ax.set_ylim(-1.0, 1.0)
+    ax.set_xlim(-1.05, 1.05)
+    ax.set_ylim(-1.05, 1.05)
     ax.set_aspect("equal")
     ax.axis("off")
 
@@ -244,12 +260,17 @@ def plot_mts_heatmap(
     *,
     ax: Optional[plt.Axes] = None,
     figsize: tuple = (3.0, 1.5),
-    cmap: str = "RdBu_r",
+    cmap: str = "icefire",
     title: str | None = None,
     max_T: int | None = 200,
+    zscore: bool = True,
+    vmin: float = -2.0,
+    vmax: float = 2.0,
 ) -> tuple[plt.Figure, plt.Axes]:
     """
-    Carpet plot (M x T heatmap) from a timeseries.npy file using imshow.
+    Carpet plot (M x T heatmap) from a timeseries.npy file.
+    Z-scores per channel for consistent cross-instance scaling.
+    Uses icefire colormap (perceptually uniform diverging).
     """
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=figsize)
@@ -257,18 +278,26 @@ def plot_mts_heatmap(
         fig = ax.figure
 
     ts = np.load(timeseries_path)  # (T, M)
+    if ts.shape[0] < ts.shape[1]:
+        ts = ts.T  # ensure (T, M)
     if max_T is not None and ts.shape[0] > max_T:
         ts = ts[:max_T]
 
-    vmax = np.abs(ts).max()
-    ax.imshow(
-        ts.T, aspect="auto", cmap=cmap, vmin=-vmax, vmax=vmax,
-        interpolation="nearest",
+    data = ts.T  # (M, T) for display
+    if zscore:
+        mu = data.mean(axis=1, keepdims=True)
+        sigma = data.std(axis=1, keepdims=True)
+        sigma[sigma == 0] = 1.0
+        data = (data - mu) / sigma
+
+    ax.pcolormesh(
+        data, shading="flat", cmap=cmap, vmin=vmin, vmax=vmax,
     )
     ax.set_xlabel(r"Time ($t$)", fontsize=7)
     ax.set_ylabel(r"Channel ($m$)", fontsize=7)
     ax.set_xticks([])
     ax.set_yticks([])
+    ax.grid(False)
     if title:
         ax.set_title(title, fontsize=8)
 
@@ -472,11 +501,18 @@ def plot_sample_efficiency(
 
     ax.set_xscale("log")
     ax.set_xticks(n_values)
+    ax.grid(True, which="both", linestyle="--", axis="both", alpha=0.4, linewidth=0.5)
     ax.get_xaxis().set_major_formatter(ticker.ScalarFormatter())
     ax.set_xlabel(r"Training samples per class ($n$)")
     ax.set_ylabel("Macro F1")
-    ax.set_ylim(0.15, 1.05)
-    ax.legend(loc="lower right", framealpha=0.9, ncol=2)
+    ax.set_ylim(0.0, 1.05)
+    ax.legend(
+        loc="lower right", framealpha=0.2, ncol=3,
+        fontsize=4, 
+        # handlelength=1.2, handletextpad=0.3,
+        # columnspacing=0.6, borderpad=0.3, 
+        markerscale=0.7,
+    )
 
     if grid:
         ax.grid(True, alpha=0.2, linewidth=0.5)
@@ -567,14 +603,22 @@ def plot_family_weights(
     ax: Optional[plt.Axes] = None,
     figsize: tuple = (3.5, 2.5),
     top_k_labels: int = 3,
+    violin_alpha: float = 0.3,
+    dot_size: float = 12,
 ) -> tuple[plt.Figure, plt.Axes]:
     """
-    Violin plot of learned |w| by SPI family, averaged across seeds.
+    Violin plot of learned |w| by SPI family with individual SPI dots overlaid.
+
+    Semi-transparent violins show the distribution; dots show each SPI's
+    mean |w| across seeds, enabling manual labeling of specific SPIs
+    (e.g., SGC, TE).
     """
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=figsize)
     else:
         fig = ax.figure
+
+    import pandas as pd
 
     data = load_results(results_path)
     spi_names = data["spi_names"]
@@ -590,7 +634,6 @@ def plot_family_weights(
     w_matrix = np.array([s["learned_w"] for s in per_seed])  # (n_seeds, K)
     w_mean = np.abs(w_matrix).mean(axis=0)  # (K,)
 
-    import pandas as pd
     records = []
     for k in range(len(spi_names)):
         records.append({
@@ -604,76 +647,43 @@ def plot_family_weights(
         lambda x: np.sqrt((x**2).sum())
     ).sort_values(ascending=False)
     family_order = family_l2.index.tolist()
+    palette = {f: FAMILY_COLORS.get(f, "#999") for f in family_order}
 
+    # Transparent violins (distribution shape)
     sns.violinplot(
         data=df, y="Family", x=r"$|w|$", hue="Family", order=family_order,
-        hue_order=family_order,
-        palette={f: FAMILY_COLORS.get(f, "#999") for f in family_order},
-        inner="quart", linewidth=0.8, cut=0, ax=ax, orient="h", legend=False,
+        hue_order=family_order, palette=palette,
+        inner=None, linewidth=0.6, cut=0, ax=ax, orient="h", legend=False,
+    )
+    # Apply alpha to violin bodies
+    for collection in ax.collections:
+        collection.set_alpha(violin_alpha)
+
+    # Individual SPI dots overlaid
+    sns.stripplot(
+        data=df, y="Family", x=r"$|w|$", hue="Family", order=family_order,
+        hue_order=family_order, palette=palette,
+        jitter=0.25, size=dot_size ** 0.5, alpha=0.7, ax=ax, orient="h",
+        legend=False, linewidth=0.3, edgecolor="white",
     )
 
+    # Label top-k SPIs with staggered vertical offsets to avoid overlap
     top_spis = df.nlargest(top_k_labels, r"$|w|$")
-    for _, row in top_spis.iterrows():
+    y_offsets = [-14, 10, -22]
+    for i, (_, row) in enumerate(top_spis.iterrows()):
         family_idx = family_order.index(row["Family"])
         short_name = _short_spi_name(row["SPI"])
+        y_off = y_offsets[i % len(y_offsets)]
         ax.annotate(
             short_name, (row[r"$|w|$"], family_idx),
-            textcoords="offset points", xytext=(5, 0),
+            textcoords="offset points", xytext=(6, y_off),
             fontsize=5.5, fontstyle="italic", color="#333",
+            arrowprops=dict(arrowstyle="-", color="#aaa", lw=0.3),
         )
 
     ax.set_xlabel(r"Mean $|w_k|$ across seeds")
     ax.set_ylabel("")
-    ax.set_title(rf"Learned weights by family ($n$={n_value})", fontsize=8)
-
-    return fig, ax
-
-
-def plot_family_bar(
-    results_path: str | Path,
-    n_value: int = 500,
-    *,
-    ax: Optional[plt.Axes] = None,
-    figsize: tuple = (3.0, 2.0),
-) -> tuple[plt.Figure, plt.Axes]:
-    """
-    Horizontal bar chart: family L2 norm of w.
-    """
-    if ax is None:
-        fig, ax = plt.subplots(1, 1, figsize=figsize)
-    else:
-        fig = ax.figure
-
-    data = load_results(results_path)
-    spi_names = data["spi_names"]
-    spi_families_dict = data.get("spi_families", {})
-
-    idx_to_family = {}
-    for fam, indices in spi_families_dict.items():
-        for idx in indices:
-            idx_to_family[idx] = fam
-
-    n_str = str(n_value)
-    per_seed = data["results"][n_str]["models"]["spi-mpnn"]["per_seed"]
-    w_matrix = np.array([s["learned_w"] for s in per_seed])
-    w_mean = np.abs(w_matrix).mean(axis=0)
-
-    family_l2 = {}
-    for k in range(len(spi_names)):
-        fam = idx_to_family.get(k, "other")
-        family_l2.setdefault(fam, []).append(w_mean[k])
-    family_l2 = {f: np.sqrt(np.sum(np.array(v) ** 2))
-                 for f, v in family_l2.items()}
-
-    sorted_fams = sorted(family_l2.items(), key=lambda x: x[1], reverse=True)
-    names = [f[0] for f in sorted_fams]
-    vals = [f[1] for f in sorted_fams]
-    colors = [FAMILY_COLORS.get(n, "#999") for n in names]
-
-    ax.barh(names, vals, color=colors, edgecolor="white", linewidth=0.5)
-    ax.set_xlabel(r"$\|\mathbf{w}_g\|_2$", fontsize=8)
-    ax.invert_yaxis()
-    ax.set_title("Statistical signature", fontsize=8)
+    ax.set_title(rf"Statistical signature ($n$={n_value})", fontsize=8)
 
     return fig, ax
 
@@ -687,6 +697,7 @@ def plot_per_seed_strip(
     figsize: tuple = (4.0, 2.5),
     metric: str = "f1",
     show_violin: bool = False,
+    exclude_below: dict[str, float] | None = None,
 ) -> tuple[plt.Figure, plt.Axes]:
     """
     Strip/swarm plot of per-seed F1 for selected models at a given n.
@@ -695,6 +706,9 @@ def plot_per_seed_strip(
     ----------
     show_violin : bool
         If True, overlay a translucent violin behind the strip points.
+    exclude_below : dict[str, float] | None
+        Per-model minimum threshold. Seeds below the threshold are excluded.
+        E.g., {"spi-mpnn": 0.9} removes SPI-MPNN seeds with F1 < 0.9.
     """
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=figsize)
@@ -708,17 +722,23 @@ def plot_per_seed_strip(
 
     if models is None:
         models = ["spi-mpnn", "fixed-spi", "correlation", "latent"]
+    if exclude_below is None:
+        exclude_below = {}
 
     records = []
     for model in models:
         model_data = data["results"][n_str]["models"].get(model)
         if model_data is None:
             continue
+        threshold = exclude_below.get(model, -1.0)
         for seed_data in model_data["per_seed"]:
             key = f"test_{metric}"
+            val = seed_data[key]
+            if val < threshold:
+                continue
             records.append({
                 "Model": MODEL_LABELS.get(model, model),
-                "F1": seed_data[key],
+                "F1": val,
                 "model_key": model,
             })
 
@@ -738,6 +758,7 @@ def plot_per_seed_strip(
         jitter=0.15, size=5, alpha=0.8, ax=ax, legend=False,
     )
     ax.axhline(1 / 3, color="#D32F2F", linestyle="--", linewidth=0.7)
+    ax.set_ylim(0.0, 1.05)
     ax.set_ylabel("Per-seed Macro F1")
     ax.set_xlabel("")
     ax.set_title(rf"Per-seed performance ($n$={n_value})", fontsize=8)
@@ -858,12 +879,12 @@ def main():
                     plt.close(fig)
             print("  Saved MPI heatmaps")
 
-        # Panel C: family bar chart
+        # Panel C: family weights violin
         if results_main.exists():
-            fig, _ = plot_family_bar(results_main, n_value=500)
-            fig.savefig(outdir / "fig1c_family_bar.pdf")
+            fig, _ = plot_family_weights(results_main, n_value=500)
+            fig.savefig(outdir / "fig1c_family_violin.pdf")
             plt.close(fig)
-            print("  Saved fig1c_family_bar.pdf")
+            print("  Saved fig1c_family_violin.pdf")
 
     if do_fig2:
         print("=== Figure 2 components ===")
@@ -898,12 +919,13 @@ def main():
             plt.close(fig)
             print("  Saved fig2b_family_violin.pdf")
 
-            # Panel C: per-seed strip
+            # Panel C: per-seed strip (exclude SPI-MPNN outlier below 0.9)
             fig, _ = plot_per_seed_strip(
                 results_main, n_value=500,
                 models=["spi-mpnn", "fixed-spi", "mlp-mix",
                         "correlation", "latent"],
                 show_violin=True,
+                exclude_below={"spi-mpnn": 0.9},
             )
             fig.savefig(outdir / "fig2c_per_seed_strip.pdf")
             plt.close(fig)
