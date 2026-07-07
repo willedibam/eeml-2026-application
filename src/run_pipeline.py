@@ -32,10 +32,11 @@ python -m src.run_pipeline \\
 
 Available models
 ----------------
-spi-mpnn       Proposed: learned linear adj from K SPI descriptors
-correlation    Baseline: fixed adj from Pearson |r_ij|
-latent         Baseline: per-sample adj from learned node embeddings
-fixed-spi      Ablation: fully connected + SPI edge features
+spi-mpnn        Proposed: learned linear adj from K SPI descriptors
+correlation     Baseline: fixed adj from Pearson |r_ij|
+latent          Baseline: symmetric per-sample adj (dot-product embeddings)
+latent-directed Baseline: directed per-sample adj (ordered-pair MLP; fair control)
+fixed-spi       Ablation: fully connected + SPI edge features
 mlp-mix        Ablation: nonlinear adj from MLP(SPI)
 node-only      Ablation: no graph, MLP over node features
 edge-ablation  Ablation: SPI adj + zero edge features
@@ -78,6 +79,7 @@ from .model import (
     CorrelationMPNN,
     EdgeAblationMPNN,
     FixedSPIMPNN,
+    LatentDirectedMPNN,
     LatentGraphMPNN,
     MLPMixMPNN,
     NodeOnlyMLP,
@@ -97,6 +99,7 @@ ALL_MODELS = [
     "spi-mpnn",
     "correlation",
     "latent",
+    "latent-directed",
     "fixed-spi",
     "mlp-mix",
     "node-only",
@@ -157,6 +160,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     # Regularisation
     p.add_argument("--l1-lambda", type=float, default=0.001)
     p.add_argument("--group-lambda", type=float, default=0.02)
+    p.add_argument("--no-group-size-norm", action="store_true",
+                   help="Disable sqrt(|family|) weighting of the group-lasso "
+                        "penalty (reproduces pre-fix runs; not recommended). "
+                        "With normalisation ON (default), --group-lambda is on a "
+                        "different scale than legacy runs and may need re-tuning.")
     # Optimisation stability
     p.add_argument("--warmup-epochs", type=int, default=60,
                    help="Linear LR warmup epochs before cosine decay")
@@ -286,6 +294,8 @@ def _make_model(
         return CorrelationMPNN(top_d=args.top_d, **common)
     elif name == "latent":
         return LatentGraphMPNN(top_d=args.top_d, embed_dim=args.embed_dim, **common)
+    elif name == "latent-directed":
+        return LatentDirectedMPNN(top_d=args.top_d, embed_dim=args.embed_dim, **common)
     elif name == "fixed-spi":
         return FixedSPIMPNN(n_spi=K, **common)
     elif name == "mlp-mix":
@@ -449,6 +459,7 @@ def _run_standard(args: argparse.Namespace, data_dir: Path, output_dir: Path) ->
         l1_lambda=args.l1_lambda,
         group_lambda=args.group_lambda,
         spi_family_indices=list(spi_family_indices.values()) if args.group_lambda > 0 else None,
+        group_size_norm=not args.no_group_size_norm,
         use_cosine_decay=not args.no_cosine_decay,
         warmup_epochs=args.warmup_epochs,
         w_lr_mult=args.w_lr_mult,
@@ -484,6 +495,7 @@ def _run_standard(args: argparse.Namespace, data_dir: Path, output_dir: Path) ->
             "patience": args.patience,
             "l1_lambda": args.l1_lambda,
             "group_lambda": args.group_lambda,
+            "group_size_norm": not args.no_group_size_norm,
             "warmup_epochs": args.warmup_epochs,
             "w_lr_mult": args.w_lr_mult,
             "restarts": args.restarts,
@@ -631,6 +643,7 @@ def _run_sample_efficiency(
         l1_lambda=args.l1_lambda,
         group_lambda=args.group_lambda,
         spi_family_indices=list(spi_family_indices.values()) if args.group_lambda > 0 else None,
+        group_size_norm=not args.no_group_size_norm,
         use_cosine_decay=not args.no_cosine_decay,
         warmup_epochs=args.warmup_epochs,
         w_lr_mult=args.w_lr_mult,
@@ -710,6 +723,7 @@ def _run_sample_efficiency(
             "patience": args.patience,
             "l1_lambda": args.l1_lambda,
             "group_lambda": args.group_lambda,
+            "group_size_norm": not args.no_group_size_norm,
             "warmup_epochs": args.warmup_epochs,
             "w_lr_mult": args.w_lr_mult,
             "restarts": args.restarts,

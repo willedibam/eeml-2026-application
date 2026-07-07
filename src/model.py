@@ -394,6 +394,113 @@ class LatentGraphMPNN(nn.Module):
 
 
 # ---------------------------------------------------------------------------
+# LatentDirectedMPNN — baseline (fair, asymmetric latent competitor)
+# ---------------------------------------------------------------------------
+
+class LatentDirectedMPNN(nn.Module):
+    """
+    Baseline: per-sample DIRECTED adjacency from learned node embeddings.
+
+    Unlike LatentGraphMPNN (symmetric dot-product, A_ij = A_ji by
+    construction), this scores each ordered pair with an MLP so that
+    A_ij != A_ji in general:
+
+        h_i   = adj_encoder(x_i)                     # (M, embed_dim)
+        A_ij  = softplus( MLP([h_i ; h_j]) )         # asymmetric
+
+    This is the fair competitor to SPIEdgeMPNN and the correct control for
+    the Markov-equivalence argument. The symmetric LatentGraphMPNN *cannot*
+    represent directed edges, so its failure on chain/fork/collider is
+    guaranteed a priori and proves nothing about latent graph learning. An
+    edge-scoring MLP over ordered pairs (cf. NRI, Kipf et al. 2018;
+    directed graph learning in MTGNN, Wu et al. 2020) CAN represent
+    asymmetric structure. If it still fails here, the limitation is
+    sample-efficiency / inductive bias — not expressiveness — which is the
+    honest claim. If it succeeds, the "latent cannot access chain--fork"
+    narrative must be retired. Either outcome is worth knowing.
+
+    Parameter budget for adjacency is comparable to SPIEdgeMPNN: the
+    encoder is n_node_features*embed_dim and the pair MLP is small.
+    """
+
+    def __init__(
+        self,
+        n_node_features: int,
+        n_classes: int,
+        hidden: int = 64,
+        n_layers: int = 2,
+        top_d: int = 3,
+        embed_dim: int = 8,
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+        self.top_d = top_d
+        self.embed_dim = embed_dim
+
+        self.adj_encoder = nn.Linear(n_node_features, embed_dim)
+        # Ordered-pair scorer: MLP([h_i; h_j]) is not symmetric in (i, j).
+        self.adj_score = nn.Sequential(
+            nn.Linear(2 * embed_dim, embed_dim),
+            nn.ReLU(),
+            nn.Linear(embed_dim, 1),
+        )
+        self.node_proj = nn.Linear(n_node_features, hidden)
+        self.edge_net = nn.Sequential(
+            nn.Linear(2 * embed_dim, hidden),
+            nn.GELU(),
+            nn.Linear(hidden, hidden),
+            nn.GELU(),
+        )
+        self.mp_layers = nn.ModuleList(
+            [MPLayer(hidden, hidden, dropout) for _ in range(n_layers)]
+        )
+        self.classifier = nn.Sequential(
+            nn.Linear(2 * hidden, hidden),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden, n_classes),
+        )
+
+    def forward(self, batch: Batch) -> torch.Tensor:
+        device = batch.x.device
+
+        all_ei, all_ea, all_ew, bvec = [], [], [], []
+        offset = 0
+        for i in range(batch.num_graphs):
+            node_mask = batch.batch == i
+            x_i = batch.x[node_mask]
+            M = x_i.shape[0]
+
+            h_emb = self.adj_encoder(x_i)                       # (M, embed_dim)
+            hi = h_emb.unsqueeze(1).expand(M, M, self.embed_dim)
+            hj = h_emb.unsqueeze(0).expand(M, M, self.embed_dim)
+            pair = torch.cat([hi, hj], dim=-1)                  # (M, M, 2*embed_dim)
+            scores = self.adj_score(pair).squeeze(-1)           # (M, M), asymmetric
+            adj = F.softplus(scores)
+            ei, ew = _sparsify(adj, self.top_d)
+            ea = self.edge_net(torch.cat([h_emb[ei[0]], h_emb[ei[1]]], dim=1))
+
+            all_ei.append(ei + offset)
+            all_ea.append(ea)
+            all_ew.append(ew)
+            bvec.append(torch.full((M,), i, dtype=torch.long, device=device))
+            offset += M
+
+        edge_index = torch.cat(all_ei, dim=1)
+        edge_attr = torch.cat(all_ea)
+        edge_weight = torch.cat(all_ew)
+        bvec = torch.cat(bvec)
+
+        h = self.node_proj(batch.x)
+        for layer in self.mp_layers:
+            h = layer(h, edge_index, edge_attr, edge_weight)
+        out = torch.cat(
+            [global_mean_pool(h, bvec), global_max_pool(h, bvec)], dim=1
+        )
+        return self.classifier(out)
+
+
+# ---------------------------------------------------------------------------
 # FixedSPIMPNN — ablation
 # ---------------------------------------------------------------------------
 

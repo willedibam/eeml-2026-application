@@ -1,11 +1,11 @@
-base_output_dir: data/260327_eeml/
+base_output_dir: data/260707_eeml/
 timestamp: false
-pyspi_config: configs/pyspi-v2/cases/eeml.yaml
+pyspi_config: configs/pyspi-v2/benchmarked90_amortized_config.yaml
 pyspi_subset: default
 normalise: false
 rng_seed: 110305
 save_heatmap: false
-threads: 4
+threads: 1
 
 defaults:
   M_values: [10]

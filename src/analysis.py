@@ -245,7 +245,13 @@ def plot_weight_inspection(results: dict, out_dir: Path) -> None:
 
 
 def plot_family_norms(results: dict, out_dir: Path) -> None:
-    """Group-level ||w_g||_2 per SPI family, for spi-mpnn."""
+    """Size-normalised family importance (||w_g||_2 / sqrt(|g|)) for spi-mpnn.
+
+    Uses RMS weight magnitude per family, NOT the raw group L2 norm. Raw L2
+    grows with family size, so a bar chart of ||w_g||_2 would rank the
+    largest family (causal, 48 SPIs) top by construction. RMS reports
+    per-SPI magnitude and is comparable across unequally sized families.
+    """
     spi_names = results.get("spi_names", [])
     spi_families = results.get("spi_families", {})
     if not spi_names or not spi_families:
@@ -271,7 +277,11 @@ def plot_family_norms(results: dict, out_dir: Path) -> None:
     w_matrix = np.array(w_list)
     fam_names = list(spi_families.keys())
     fam_norms = np.array([
-        [np.linalg.norm(w_matrix[s, spi_families[f]]) for f in fam_names]
+        [
+            np.linalg.norm(w_matrix[s, spi_families[f]])
+            / max(len(spi_families[f]), 1) ** 0.5
+            for f in fam_names
+        ]
         for s in range(w_matrix.shape[0])
     ])
     mean_norms = fam_norms.mean(axis=0)
@@ -284,7 +294,7 @@ def plot_family_norms(results: dict, out_dir: Path) -> None:
             color="#1565C0", alpha=0.8, capsize=3, edgecolor="none")
     ax.set_yticks(y)
     ax.set_yticklabels([fam_names[i] for i in order], fontsize=10)
-    ax.set_xlabel("||w_g||₂", fontsize=11)
+    ax.set_xlabel("||w_g||₂ / √|g|  (per-SPI RMS)", fontsize=11)
     ax.set_title(f"Family importance ({w_matrix.shape[0]} seeds)", fontsize=11)
     ax.invert_yaxis()
     plt.tight_layout()

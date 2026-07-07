@@ -653,10 +653,14 @@ def plot_family_weights(
         })
     df = pd.DataFrame(records)
 
-    family_l2 = df.groupby("Family")[r"$|w|$"].apply(
-        lambda x: np.sqrt((x**2).sum())
+    # Rank families by per-SPI RMS magnitude ( ||w_g||_2 / sqrt(|g|) ), NOT
+    # raw summed L2. Raw L2 grows with family size, so the largest family
+    # (causal, 48 SPIs) would rank top by construction. RMS is size-invariant
+    # and matches the sqrt(|g|)-normalised group-lasso penalty in train.py.
+    family_rms = df.groupby("Family")[r"$|w|$"].apply(
+        lambda x: np.sqrt((x**2).mean())
     ).sort_values(ascending=False)
-    family_order = family_l2.index.tolist()
+    family_order = family_rms.index.tolist()
     palette = {f: FAMILY_COLORS.get(f, "#999") for f in family_order}
 
     # Transparent violins (distribution shape)
