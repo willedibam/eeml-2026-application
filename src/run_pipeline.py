@@ -70,6 +70,7 @@ from .features import node_features
 from .graph_build import (
     SPIScaler,
     assign_spi_families,
+    empirical_spi_modules,
     build_graph,
     filter_spi_dimensions,
     load_spi_names,
@@ -169,6 +170,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     # n=100/class: (0.02, norm ON) 0.627 | (0.005, ON) 0.973 | (0.02, OFF)
     # 0.908. Provisional -- confirm with a multi-seed sweep across n.
     p.add_argument("--group-lambda", type=float, default=0.005)
+    p.add_argument("--spi-groups", choices=["families", "modules"],
+                   default="families",
+                   help="Group-lasso grouping. 'families' = hand-assigned "
+                        "pyspi taxonomy (default). 'modules' = data-driven "
+                        "clusters of SPI output covariance, fitted on the "
+                        "training split only. The hand families do not match "
+                        "the empirical structure on VAR (ARI 0.06), so "
+                        "'modules' is the defensible choice when the recovered "
+                        "group is the scientific claim.")
     p.add_argument("--no-group-size-norm", action="store_true",
                    help="Disable sqrt(|family|) weighting of the group-lasso "
                         "penalty (reproduces pre-fix runs; not recommended). "
@@ -447,7 +457,12 @@ def _run_standard(args: argparse.Namespace, data_dir: Path, output_dir: Path) ->
         print("[ERROR] All SPI dimensions dropped"); return
 
     scaled_spi, _ = _scale_tensors(raw_spi, list(train_idx), retained_indices)
-    _, spi_family_indices = assign_spi_families(retained_names)
+    if args.spi_groups == "modules":
+        _, spi_family_indices = empirical_spi_modules(
+            [scaled_spi[i] for i in train_idx]
+        )
+    else:
+        _, spi_family_indices = assign_spi_families(retained_names)
 
     print("[STAGE] Building PyG graphs...")
     dataset = _build_dataset(scaled_spi, raw_mts, labels)
@@ -510,6 +525,7 @@ def _run_standard(args: argparse.Namespace, data_dir: Path, output_dir: Path) ->
             "restarts": args.restarts,
             "top_d": args.top_d,
             "no_cosine_decay": args.no_cosine_decay,
+            "spi_groups": args.spi_groups,
         },
         "models": {},
     }
@@ -620,10 +636,16 @@ def _run_sample_efficiency(
     if K == 0:
         print("[ERROR] All SPI dimensions dropped"); return
 
-    _, spi_family_indices = assign_spi_families(retained_names)
+    raw_spi_retained = [t[:, :, retained_indices] for t in raw_spi]
+    if args.spi_groups == "modules":
+        # Fit on the largest training pool only (never val/test).
+        _, spi_family_indices = empirical_spi_modules(
+            [raw_spi_retained[i] for i in largest_train_idx]
+        )
+    else:
+        _, spi_family_indices = assign_spi_families(retained_names)
 
     # Build unscaled graph dataset (scaling happens per-n below)
-    raw_spi_retained = [t[:, :, retained_indices] for t in raw_spi]
 
     val_data_unscaled: list[tuple[np.ndarray, np.ndarray, int]] = [
         (raw_spi_retained[i], raw_mts[i], labels[i]) for i in val_idx
@@ -738,6 +760,7 @@ def _run_sample_efficiency(
             "restarts": args.restarts,
             "top_d": args.top_d,
             "no_cosine_decay": args.no_cosine_decay,
+            "spi_groups": args.spi_groups,
         },
         "results": results_by_n,
     }

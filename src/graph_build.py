@@ -278,6 +278,64 @@ def assign_spi_families(
     return family_names, family_indices
 
 
+def empirical_spi_modules(
+    tensors: list[np.ndarray],
+    n_modules: int = 6,
+    *,
+    max_instances: int = 200,
+) -> tuple[list[str], dict[str, list[int]]]:
+    """Group SPIs by how their OUTPUTS co-vary, not by their names.
+
+    The hand-assigned families in _FAMILY_RULES are intuitive categories, but
+    on the VAR data they do not recover the empirical structure of the SPI
+    outputs (adjusted Rand index 0.06 vs an average-linkage clustering of
+    1 - |corr|; within-family |corr| 0.25 vs 0.13 between). That matters
+    because the group lasso penalises these groups and the headline claim is
+    "family X carries the weight": if a family is not a coherent block, the
+    penalty is regularising an incoherent bag and the claim is about a label
+    rather than a mode of dependence.
+
+    This returns data-driven modules (the on-data analogue of the module
+    characterisation in Cliff et al. 2023), suitable for passing to
+    TrainConfig.spi_family_indices in place of assign_spi_families.
+
+    MUST be fitted on TRAINING tensors only -- the grouping is part of the
+    model, so deriving it from val/test would leak.
+
+    Returns (per-SPI module label, {module_name: [indices]}), matching the
+    signature of assign_spi_families.
+    """
+    from scipy.cluster.hierarchy import fcluster, linkage
+    from scipy.spatial.distance import squareform
+
+    rows = []
+    for t in tensors[:max_instances]:
+        M = t.shape[0]
+        off = ~np.eye(M, dtype=bool)
+        rows.append(t[off])                       # (M*(M-1), K)
+    X = np.nan_to_num(np.concatenate(rows, axis=0), nan=0.0,
+                      posinf=0.0, neginf=0.0)
+    K = X.shape[1]
+
+    C = np.nan_to_num(np.abs(np.corrcoef(X.T)), nan=0.0)
+    np.fill_diagonal(C, 1.0)
+    D = 1.0 - C
+    np.fill_diagonal(D, 0.0)
+    D = (D + D.T) / 2.0
+
+    Z = linkage(squareform(D, checks=False), method="average")
+    labels = fcluster(Z, t=min(n_modules, K), criterion="maxclust")
+
+    module_names = [f"module{int(l)}" for l in labels]
+    module_indices: dict[str, list[int]] = {}
+    for i, name in enumerate(module_names):
+        module_indices.setdefault(name, []).append(i)
+
+    sizes = {k: len(v) for k, v in sorted(module_indices.items())}
+    print(f"[SPI-MODULES] {len(module_indices)} empirical modules, sizes {sizes}")
+    return module_names, module_indices
+
+
 def load_spi_names(dataset_dir: Path) -> list[str]:
     """Extract ordered SPI names from meta.json."""
     meta = load_json(dataset_dir / "meta.json")
