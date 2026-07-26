@@ -69,21 +69,32 @@ def _evaluate(
 def _build_optimizer_and_scheduler(
     model: nn.Module, config: TrainConfig
 ) -> tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LRScheduler | None]:
-    """Build optimizer with optional separate LR for spi_w/spi_b params."""
-    if config.w_lr_mult != 1.0 and hasattr(model, "spi_w"):
+    """Build optimizer, isolating spi_w/spi_b into their own param group.
+
+    spi_w is the interpreted scientific output; its sparsity is imposed
+    explicitly by the L1 + group-lasso terms in the loss. AdamW weight decay
+    would add a second, unreported L2 shrinkage on the same parameter,
+    confounding the recovered family signature. We therefore always put
+    spi_w/spi_b in a group with weight_decay=0 (and apply the w_lr_mult LR
+    there). All other parameters keep the configured weight decay.
+    """
+    if hasattr(model, "spi_w"):
         w_params = [model.spi_w, model.spi_b]
         w_param_ids = {id(p) for p in w_params}
         other_params = [p for p in model.parameters() if id(p) not in w_param_ids]
         param_groups = [
-            {"params": other_params, "lr": config.lr},
-            {"params": w_params, "lr": config.lr * config.w_lr_mult},
+            {"params": other_params, "lr": config.lr,
+             "weight_decay": config.weight_decay},
+            {"params": w_params, "lr": config.lr * config.w_lr_mult,
+             "weight_decay": 0.0},
         ]
     else:
-        param_groups = [{"params": model.parameters(), "lr": config.lr}]
+        param_groups = [
+            {"params": model.parameters(), "lr": config.lr,
+             "weight_decay": config.weight_decay}
+        ]
 
-    optimizer = torch.optim.AdamW(
-        param_groups, weight_decay=config.weight_decay
-    )
+    optimizer = torch.optim.AdamW(param_groups)
 
     if not config.use_cosine_decay:
         return optimizer, None
