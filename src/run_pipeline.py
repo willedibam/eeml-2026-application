@@ -162,7 +162,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--no-cosine-decay", action="store_true")
     # Regularisation
     p.add_argument("--l1-lambda", type=float, default=0.001)
-    p.add_argument("--group-lambda", type=float, default=0.02)
+    # Re-tuned for the sqrt(|g|)-normalised group lasso. The old 0.02 was
+    # tuned for the UNnormalised penalty; with normalisation ON it is ~4-7x
+    # too strong (sqrt(48)=6.9 for causal, sqrt(52)=7.2 for spectral), which
+    # crushes spi_w and costs ~0.35 macro-F1 at n=100. Measured, single seed,
+    # n=100/class: (0.02, norm ON) 0.627 | (0.005, ON) 0.973 | (0.02, OFF)
+    # 0.908. Provisional -- confirm with a multi-seed sweep across n.
+    p.add_argument("--group-lambda", type=float, default=0.005)
     p.add_argument("--no-group-size-norm", action="store_true",
                    help="Disable sqrt(|family|) weighting of the group-lasso "
                         "penalty (reproduces pre-fix runs; not recommended). "

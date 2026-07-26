@@ -236,6 +236,7 @@ def stability_selection(
     subsample_frac: float = 0.5,
     top_q: int = 10,
     seed: int = 0,
+    min_val_f1: float | None = None,
 ) -> dict[str, Any]:
     """Stability selection for spi_w (Meinshausen & Buhlmann 2010).
 
@@ -255,6 +256,13 @@ def stability_selection(
     and it degrades gracefully under collinearity (a collinear pair simply
     splits its frequency).
 
+    Only *converged* fits may vote. Meinshausen-Buhlmann assumes each
+    subsample yields a valid fit; a run that failed to optimise has an
+    essentially arbitrary spi_w, and letting it vote dilutes every frequency
+    toward noise (observed: fits ranging val F1 0.55-0.997 in one batch
+    produced a spuriously flat selection profile). `min_val_f1` drops
+    non-converged fits; pass None to accept all (and inspect n_used).
+
     Returns per-SPI selection frequency, sign consistency, and the fits' val
     F1s (to confirm the subsampled fits are actually learning).
     """
@@ -265,6 +273,7 @@ def stability_selection(
     counts: np.ndarray | None = None
     sign_sum: np.ndarray | None = None
     val_f1s: list[float] = []
+    n_used = 0
 
     # Subsampled fits are a diagnostic, not model selection: one restart and
     # no test evaluation keeps the cost proportionate.
@@ -286,13 +295,24 @@ def stability_selection(
             counts = np.zeros(w.size)
             sign_sum = np.zeros(w.size)
 
+        val_f1s.append(res.best_val_f1)
+        if min_val_f1 is not None and res.best_val_f1 < min_val_f1:
+            continue  # non-converged fit: its w is arbitrary, no vote
+
         q = min(top_q, w.size)
         top_idx = np.argsort(np.abs(w))[::-1][:q]
         counts[top_idx] += 1.0
         sign_sum[top_idx] += np.sign(w[top_idx])
-        val_f1s.append(res.best_val_f1)
+        n_used += 1
 
-    freq = counts / n_subsamples
+    if n_used == 0:
+        raise ValueError(
+            f"No subsample fit reached min_val_f1={min_val_f1}; "
+            f"val F1s ranged {min(val_f1s):.3f}-{max(val_f1s):.3f}. "
+            "Lower the threshold or fix the training config."
+        )
+
+    freq = counts / n_used
     # Sign consistency among the fits that selected each SPI (1.0 = always
     # same direction). A high-frequency SPI with inconsistent sign is a
     # magnitude artifact, not a coherent effect.
@@ -303,10 +323,14 @@ def stability_selection(
         "selection_frequency": freq.tolist(),
         "sign_consistency": sign_consistency.tolist(),
         "n_subsamples": n_subsamples,
+        "n_used": n_used,                     # converged fits that voted
+        "min_val_f1": min_val_f1,
         "subsample_frac": subsample_frac,
         "top_q": top_q,
         "val_f1_mean": float(np.mean(val_f1s)),
         "val_f1_std": float(np.std(val_f1s)),
+        "val_f1_used_mean": float(np.mean([v for v in val_f1s
+                                           if min_val_f1 is None or v >= min_val_f1])),
     }
 
 

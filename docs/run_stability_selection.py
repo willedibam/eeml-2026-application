@@ -45,7 +45,11 @@ def main() -> None:
     p.add_argument("--subsample-frac", type=float, default=0.5)
     p.add_argument("--top-q", type=int, default=10)
     p.add_argument("--max-epochs", type=int, default=60)
-    p.add_argument("--group-lambda", type=float, default=0.02)
+    p.add_argument("--group-lambda", type=float, default=0.005)
+    p.add_argument("--min-val-f1", type=float, default=None,
+                   help="Drop subsample fits below this val F1 (their w is "
+                        "arbitrary and dilutes every frequency). Suggested: "
+                        "chance + 0.4, e.g. 0.75 for 3 balanced classes.")
     p.add_argument("--l1-lambda", type=float, default=0.001)
     p.add_argument("--top-d", type=int, default=5)
     p.add_argument("--tag", default="var")
@@ -93,8 +97,10 @@ def main() -> None:
     out = stability_selection(
         make_model, train, val, cfg,
         n_subsamples=a.n_subsamples, subsample_frac=a.subsample_frac,
-        top_q=a.top_q,
+        top_q=a.top_q, min_val_f1=a.min_val_f1,
     )
+    print(f"converged fits used: {out['n_used']}/{out['n_subsamples']}"
+          + (f" (threshold {a.min_val_f1})" if a.min_val_f1 else " (no threshold)"))
     out["spi_names"] = names
     out["families"] = fam_names
 
