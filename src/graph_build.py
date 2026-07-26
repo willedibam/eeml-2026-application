@@ -323,7 +323,15 @@ def empirical_spi_modules(
     np.fill_diagonal(D, 0.0)
     D = (D + D.T) / 2.0
 
-    Z = linkage(squareform(D, checks=False), method="average")
+    # Ward, not average linkage. Average-linkage on 1-|corr| chains badly here:
+    # measured on the VAR data (K=125) it puts 79% of SPIs in one cluster
+    # (sizes 99/13/6/3/2/2), which is barely a grouping at all and would leave
+    # the group lasso penalising one giant bag. Ward gives usable, balanced
+    # modules (34/33/24/17/10/7, largest 27%); complete is intermediate (55%).
+    # Caveat: ward assumes Euclidean dissimilarity and 1-|corr| is not strictly
+    # Euclidean, so treat the modules as a practical grouping, not a metric
+    # embedding.
+    Z = linkage(squareform(D, checks=False), method="ward")
     labels = fcluster(Z, t=min(n_modules, K), criterion="maxclust")
 
     module_names = [f"module{int(l)}" for l in labels]
