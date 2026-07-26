@@ -60,6 +60,14 @@ def main() -> None:
                         "(capped by patient, so patients never straddle).")
     p.add_argument("--max-per-class", type=int, default=None,
                    help="Further cap sessions per class per split (pilot).")
+    p.add_argument("--montage", default="01_tcp_ar",
+                   help="Restrict to ONE montage (default 01_tcp_ar). Required "
+                        "for validity: montage is confounded with class in TUSZ "
+                        "(02_tcp_le is 73%% FNSZ vs 44%% for 01_tcp_ar), so a "
+                        "mixed set lets a model learn montage->class instead of "
+                        "coupling->class. The montages also differ in channel "
+                        "count, which breaks the fixed-M assumption. Pass 'any' "
+                        "to disable (not recommended).")
     a = p.parse_args()
 
     root = Path(a.labels_dir)
@@ -73,6 +81,9 @@ def main() -> None:
         if len(rel.parts) < 4:
             continue
         split, patient = rel.parts[0], rel.parts[1]
+        montage = rel.parts[3] if len(rel.parts) > 4 else rel.parts[-2]
+        if a.montage != "any" and montage != a.montage:
+            continue
         types = session_types(c)
         if len(types) != 1:
             continue                      # none, or ambiguous (both classes)
