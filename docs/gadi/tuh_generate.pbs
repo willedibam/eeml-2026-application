@@ -1,0 +1,46 @@
+#!/bin/bash
+# TUSZ pyspi generation — PBS Pro array job (Gadi `normal`).
+# Each array task processes one chunk of the manifest across all node cores.
+# No internet needed: EDFs must already be staged to scratch (stage_data.sh).
+#
+# Submit ONE task first to validate:   qsub -J 0-0 tuh_generate.pbs
+# Then the full sweep (set -J to ceil(n_instances/CHUNK)-1):
+#                                      qsub tuh_generate.pbs
+#
+# TODO(verify, CLUSTER_SETUP.md is stale): PROJECT, storage, module/venv,
+# CHUNK sized from the pilot's measured per-instance cost, -J array range.
+
+#PBS -P <PROJECT>
+#PBS -q normal
+#PBS -l ncpus=48
+#PBS -l mem=190GB
+#PBS -l walltime=06:00:00
+#PBS -l jobfs=100GB
+#PBS -l storage=scratch/<PROJECT>+gdata/<PROJECT>
+#PBS -l wd
+#PBS -N tuh_gen
+#PBS -j oe
+#PBS -J 0-15
+
+set -euo pipefail
+
+# --- environment (TODO: verify with `module avail`, or point at a venv) ------
+module load python3/3.12 2>/dev/null || true
+# source /scratch/<PROJECT>/venvs/eeml/bin/activate
+export PYTHONPATH="${PBS_O_WORKDIR}:/scratch/<PROJECT>/mts-spi-study-cluster:${PYTHONPATH:-}"
+
+# --- paths (TODO) ------------------------------------------------------------
+MANIFEST="/scratch/<PROJECT>/tusz/manifest.csv"
+OUT="/scratch/<PROJECT>/tusz/data_fnsz_gnsz"
+PYSPI_CONFIG="${PBS_O_WORKDIR}/configs/pyspi/benchmarked90_amortized_config.yaml"
+CHUNK=250
+
+echo "task ${PBS_ARRAY_INDEX} starting $(date)"
+python "${PBS_O_WORKDIR}/docs/gadi/generate_chunk.py" \
+    --manifest "${MANIFEST}" \
+    --index "${PBS_ARRAY_INDEX}" \
+    --chunk "${CHUNK}" \
+    --out "${OUT}" \
+    --config "${PYSPI_CONFIG}" \
+    --workers "${PBS_NCPUS:-48}"
+echo "task ${PBS_ARRAY_INDEX} done $(date)"
