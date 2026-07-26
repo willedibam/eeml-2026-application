@@ -304,6 +304,159 @@ def plot_family_norms(results: dict, out_dir: Path) -> None:
     print(f"  Saved {path.name}")
 
 
+def _spi_mpnn_weight_matrix(results: dict) -> np.ndarray | None:
+    """Extract the per-seed learned_w matrix (n_seeds, K) for spi-mpnn."""
+    if results.get("mode") == "sample_efficiency":
+        se = results.get("results", {})
+        if not se:
+            return None
+        max_n = str(max(int(n) for n in se.keys()))
+        model_data = se[max_n]["models"].get("spi-mpnn")
+    else:
+        model_data = results.get("models", {}).get("spi-mpnn")
+    if not model_data:
+        return None
+    w_list = [s["learned_w"] for s in model_data.get("per_seed", []) if "learned_w" in s]
+    if not w_list:
+        return None
+    return np.asarray(w_list)
+
+
+def report_weight_stability(results: dict, top_k: int = 5) -> dict | None:
+    """Cross-seed stability of the recovered signature (identifiability check).
+
+    Collinear SPIs (e.g. the many GC/SGC variants in the 48-member causal
+    family) make the *individual* top-weighted statistic unstable across
+    seeds even when the *family* is stable. From learned_w alone this reports:
+      - top-1 family agreement across seeds,
+      - top-1 SPI agreement across seeds,
+      - mean pairwise Jaccard overlap of the per-seed top-k SPI sets.
+
+    High family agreement with low SPI agreement is the honest, expected
+    signature. Within-family 'specificity' claims (TE>GC in R1, band
+    selection in R2 of the multi-regime spec) should only be trusted where
+    SPI-level agreement / Jaccard is high — otherwise the winning member is
+    an arbitrary pick among collinear estimators.
+    """
+    spi_names = results.get("spi_names", [])
+    spi_families = results.get("spi_families", {})
+    w_matrix = _spi_mpnn_weight_matrix(results)
+    if w_matrix is None or not spi_names:
+        return None
+
+    n_seeds = w_matrix.shape[0]
+    abs_w = np.abs(w_matrix)
+
+    # top-1 SPI per seed
+    top1_spi = abs_w.argmax(axis=1)
+    _, counts = np.unique(top1_spi, return_counts=True)
+    spi_agree = counts.max() / n_seeds
+
+    # top-1 family per seed (by per-SPI RMS)
+    fam_names = list(spi_families.keys())
+    fam_agree = float("nan")
+    if fam_names:
+        rms = np.stack([
+            np.array([
+                np.linalg.norm(w_matrix[s, spi_families[f]])
+                / max(len(spi_families[f]), 1) ** 0.5
+                for f in fam_names
+            ])
+            for s in range(n_seeds)
+        ])
+        top1_fam = rms.argmax(axis=1)
+        _, fcounts = np.unique(top1_fam, return_counts=True)
+        fam_agree = fcounts.max() / n_seeds
+
+    # mean pairwise Jaccard of per-seed top-k SPI sets
+    k = min(top_k, w_matrix.shape[1])
+    topk_sets = [set(np.argsort(abs_w[s])[::-1][:k].tolist()) for s in range(n_seeds)]
+    jac = []
+    for a in range(n_seeds):
+        for b in range(a + 1, n_seeds):
+            inter = len(topk_sets[a] & topk_sets[b])
+            union = len(topk_sets[a] | topk_sets[b])
+            jac.append(inter / union if union else 0.0)
+    mean_jaccard = float(np.mean(jac)) if jac else float("nan")
+
+    modal_spi = spi_names[int(np.bincount(top1_spi).argmax())]
+    report = {
+        "n_seeds": int(n_seeds),
+        "top1_spi_agreement": float(spi_agree),
+        "top1_family_agreement": float(fam_agree),
+        f"top{k}_mean_jaccard": mean_jaccard,
+        "modal_top1_spi": modal_spi,
+    }
+    print(
+        f"  [stability] seeds={n_seeds}  "
+        f"top1-family={fam_agree:.2f}  top1-SPI={spi_agree:.2f}  "
+        f"top{k}-Jaccard={mean_jaccard:.2f}  modal-SPI={modal_spi}"
+    )
+    if spi_agree < 0.5:
+        print("  [stability] WARN: top SPI unstable across seeds (collinear family); "
+              "treat within-family specificity claims as unidentified.")
+    return report
+
+
+def report_family_uncertainty(
+    results: dict, n_boot: int = 2000, seed: int = 0
+) -> dict | None:
+    """Bootstrap CI on per-family importance and top-family selection confidence.
+
+    The seeds are the sample; we resample them with replacement to put a
+    calibrated interval on each family's mean per-SPI RMS and on the claim
+    "family X is the top-weighted family". A recovered family with P(top) near
+    1.0 and a CI separated from the runner-up is a defensible scientific
+    statement; overlapping CIs mean the ranking is not resolved at this sample
+    size. Complements report_weight_stability (which is member-level).
+    """
+    spi_families = results.get("spi_families", {})
+    w = _spi_mpnn_weight_matrix(results)
+    if w is None or not spi_families:
+        return None
+
+    fam = list(spi_families.keys())
+    n_seeds = w.shape[0]
+    rms = np.stack([
+        np.array([
+            np.linalg.norm(w[s, spi_families[f]]) / max(len(spi_families[f]), 1) ** 0.5
+            for f in fam
+        ])
+        for s in range(n_seeds)
+    ])  # (n_seeds, n_fam)
+
+    rng = np.random.default_rng(seed)
+    boot_means = np.empty((n_boot, len(fam)))
+    top_counts = np.zeros(len(fam))
+    for b in range(n_boot):
+        idx = rng.integers(0, n_seeds, n_seeds)
+        m = rms[idx].mean(axis=0)
+        boot_means[b] = m
+        top_counts[int(m.argmax())] += 1
+
+    mean = rms.mean(axis=0)
+    lo, hi = np.percentile(boot_means, [2.5, 97.5], axis=0)
+    top_conf = top_counts / n_boot
+    order = np.argsort(mean)[::-1]
+
+    print(f"  [uncertainty] {n_seeds} seeds, {n_boot} bootstraps")
+    for i in order:
+        print(
+            f"    {fam[i]:12s} RMS={mean[i]:.4f}  "
+            f"95% CI [{lo[i]:.4f}, {hi[i]:.4f}]  P(top)={top_conf[i]:.2f}"
+        )
+    if len(order) >= 2 and hi[order[1]] >= lo[order[0]]:
+        print("  [uncertainty] WARN: top-2 family CIs overlap; family ranking "
+              "not resolved at this seed count.")
+    return {
+        "families": fam,
+        "mean_rms": mean.tolist(),
+        "ci_low": lo.tolist(),
+        "ci_high": hi.tolist(),
+        "p_top": top_conf.tolist(),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Model comparison bar chart (for standard mode)
 # ---------------------------------------------------------------------------
@@ -397,12 +550,16 @@ def _analyze(results_path: Path, out_dir: Path) -> None:
         plot_sample_efficiency(results, out_dir, metric="f1")
         plot_weight_inspection(results, out_dir)
         plot_family_norms(results, out_dir)
+        report_weight_stability(results)
+        report_family_uncertainty(results)
     else:
         plot_model_comparison(results, out_dir, metric="acc")
         plot_model_comparison(results, out_dir, metric="f1")
         plot_training_curves(results, out_dir)
         plot_weight_inspection(results, out_dir)
         plot_family_norms(results, out_dir)
+        report_weight_stability(results)
+        report_family_uncertainty(results)
 
 
 def main(argv: list[str] | None = None) -> None:
