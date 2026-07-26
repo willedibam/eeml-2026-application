@@ -116,6 +116,45 @@ class MPLayer(nn.Module):
 
 
 # ---------------------------------------------------------------------------
+# Temporal encoder for the latent baselines
+# ---------------------------------------------------------------------------
+
+class _SeriesEncoder(nn.Module):
+    """Encode each channel's raw series: (N, T) -> (N, embed_dim).
+
+    A small 1D-conv stack, coarse-pooled in time. This gives the latent
+    graph learners access to the actual signal (as NRI, Kipf et al. 2018;
+    MTGNN, Wu et al. 2020 do) rather than only the four marginal node
+    summaries. With this, a latent model's failure on directed motifs
+    reflects the inductive bias of node-embedding graph construction, not
+    an information bottleneck in its inputs — the honest comparison to the
+    SPI vocabulary prior.
+    """
+
+    def __init__(self, embed_dim: int, hidden: int = 64, pool: int = 8):
+        super().__init__()
+        # Capacity is deliberately generous: a capacity probe on the VAR task
+        # showed the smaller default (hidden=16, pool=4, embed_dim=8) could not
+        # fit the training set (train-F1 0.53), which would strawman the
+        # baseline. At hidden=64/pool=8/embed_dim=32 the model fits train fully
+        # (train-F1 1.0) yet still generalises poorly at small n — the honest
+        # sample-efficiency / inductive-bias result, not an input or capacity
+        # bottleneck. Keep embed_dim >= 32 for the latent baselines.
+        self.conv = nn.Sequential(
+            nn.Conv1d(1, hidden, kernel_size=5, padding=2),
+            nn.GELU(),
+            nn.Conv1d(hidden, hidden, kernel_size=5, padding=2),
+            nn.GELU(),
+            nn.AdaptiveAvgPool1d(pool),
+        )
+        self.proj = nn.Linear(hidden * pool, embed_dim)
+
+    def forward(self, series: torch.Tensor) -> torch.Tensor:
+        z = self.conv(series.unsqueeze(1))   # (N, 1, T) -> (N, hidden, pool)
+        return self.proj(z.flatten(1))       # (N, embed_dim)
+
+
+# ---------------------------------------------------------------------------
 # Shared SPI-graph backbone
 # ---------------------------------------------------------------------------
 
@@ -310,19 +349,15 @@ class LatentGraphMPNN(nn.Module):
     Baseline: per-sample adjacency from learned node embeddings.
 
     A_ij = softplus(h_i . h_j / sqrt(embed_dim))
-    where h_i = adj_encoder(x_i) are data-derived, per-sample embeddings.
+    where h_i = adj_encoder(series_i) are learned temporal embeddings of each
+    channel's raw signal (see _SeriesEncoder).
 
     Edge attributes: [h_i; h_j] passed through edge_net.
 
-    This is a fair comparison to SPIEdgeMPNN: both produce per-sample graphs
-    and both have edge features. The difference is the feature source:
-        - SPIEdgeMPNN: precomputed statistical descriptors (SPIs)
-        - LatentGraphMPNN: learned embeddings from raw node statistics
-
-    Parameter budget for adjacency:
-        adj_encoder: n_node_features * embed_dim params
-        SPIEdgeMPNN has K + 1 params (spi_w + spi_b)
-        Set embed_dim so n_node_features * embed_dim ≈ K.
+    Fair comparison to SPIEdgeMPNN on *information access*: the adjacency is
+    built from the raw series (no statistical prior) rather than from the SPI
+    vocabulary. This is symmetric by construction (dot product), so it cannot
+    represent directed edges; LatentDirectedMPNN is the directed counterpart.
     """
 
     def __init__(
@@ -339,7 +374,7 @@ class LatentGraphMPNN(nn.Module):
         self.top_d = top_d
         self.embed_dim = embed_dim
 
-        self.adj_encoder = nn.Linear(n_node_features, embed_dim)
+        self.adj_encoder = _SeriesEncoder(embed_dim)
         self.node_proj = nn.Linear(n_node_features, hidden)
         self.edge_net = nn.Sequential(
             nn.Linear(2 * embed_dim, hidden),
@@ -364,10 +399,10 @@ class LatentGraphMPNN(nn.Module):
         offset = 0
         for i in range(batch.num_graphs):
             node_mask = batch.batch == i
-            x_i = batch.x[node_mask]
-            M = x_i.shape[0]
+            series_i = batch.series[node_mask]  # (M, T)
+            M = series_i.shape[0]
 
-            h_emb = self.adj_encoder(x_i)  # (M, embed_dim)
+            h_emb = self.adj_encoder(series_i)  # (M, embed_dim)
             scores = (h_emb @ h_emb.T) / (self.embed_dim ** 0.5)
             adj = F.softplus(scores)
             ei, ew = _sparsify(adj, self.top_d)
@@ -405,7 +440,7 @@ class LatentDirectedMPNN(nn.Module):
     construction), this scores each ordered pair with an MLP so that
     A_ij != A_ji in general:
 
-        h_i   = adj_encoder(x_i)                     # (M, embed_dim)
+        h_i   = adj_encoder(series_i)                # (M, embed_dim)
         A_ij  = softplus( MLP([h_i ; h_j]) )         # asymmetric
 
     This is the fair competitor to SPIEdgeMPNN and the correct control for
@@ -419,8 +454,10 @@ class LatentDirectedMPNN(nn.Module):
     honest claim. If it succeeds, the "latent cannot access chain--fork"
     narrative must be retired. Either outcome is worth knowing.
 
-    Parameter budget for adjacency is comparable to SPIEdgeMPNN: the
-    encoder is n_node_features*embed_dim and the pair MLP is small.
+    Node embeddings come from a temporal encoder over the raw series
+    (_SeriesEncoder), so this baseline is not starved of the very signal
+    that carries the directed coupling; the comparison isolates inductive
+    bias, not input information.
     """
 
     def __init__(
@@ -437,7 +474,7 @@ class LatentDirectedMPNN(nn.Module):
         self.top_d = top_d
         self.embed_dim = embed_dim
 
-        self.adj_encoder = nn.Linear(n_node_features, embed_dim)
+        self.adj_encoder = _SeriesEncoder(embed_dim)
         # Ordered-pair scorer: MLP([h_i; h_j]) is not symmetric in (i, j).
         self.adj_score = nn.Sequential(
             nn.Linear(2 * embed_dim, embed_dim),
@@ -468,10 +505,10 @@ class LatentDirectedMPNN(nn.Module):
         offset = 0
         for i in range(batch.num_graphs):
             node_mask = batch.batch == i
-            x_i = batch.x[node_mask]
-            M = x_i.shape[0]
+            series_i = batch.series[node_mask]                  # (M, T)
+            M = series_i.shape[0]
 
-            h_emb = self.adj_encoder(x_i)                       # (M, embed_dim)
+            h_emb = self.adj_encoder(series_i)                  # (M, embed_dim)
             hi = h_emb.unsqueeze(1).expand(M, M, self.embed_dim)
             hj = h_emb.unsqueeze(0).expand(M, M, self.embed_dim)
             pair = torch.cat([hi, hj], dim=-1)                  # (M, M, 2*embed_dim)

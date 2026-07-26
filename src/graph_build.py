@@ -61,6 +61,7 @@ def build_graph(
 
     Stores:
         x:            (M, F_n) node features (from raw MTS)
+        series:       (M, T) raw per-channel time series (node-level attribute)
         spi_tensor:   (M, M, K) SPI descriptor tensor (scaled)
         pearson_corr: (M, M) Pearson correlation matrix (from raw MTS)
         y:            scalar label
@@ -68,14 +69,23 @@ def build_graph(
 
     Graph sparsification and adjacency weighting happen inside each model's
     forward pass, so this function always stores the dense representation.
+
+    `series` is a node-level attribute (first dim = M), so PyG batches it to
+    (B*M, T) exactly like `x`. It lets the latent baselines build their
+    adjacency from the raw signal (a fair, NRI/MTGNN-style temporal encoder)
+    rather than from four marginal summaries alone. All graphs in a dataset
+    must share the same T for PyG concatenation; the current generators
+    produce fixed-T series.
     """
     M, _, K = spi_tensor.shape
 
     x = node_features(mts)  # (M, F_n)
     pearson = compute_pearson_corr(mts)  # (M, M)
+    series = np.ascontiguousarray(mts.T, dtype=np.float32)  # (M, T)
 
     return Data(
         x=torch.from_numpy(x),
+        series=torch.from_numpy(series),
         spi_tensor=torch.from_numpy(spi_tensor.astype(np.float32)),
         pearson_corr=torch.from_numpy(pearson),
         y=torch.tensor(label, dtype=torch.long),

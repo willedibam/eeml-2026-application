@@ -146,8 +146,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--hidden", type=int, default=64)
     p.add_argument("--n-layers", type=int, default=2)
     p.add_argument("--top-d", type=int, default=5)
-    p.add_argument("--embed-dim", type=int, default=8,
-                   help="Node embed dim for latent baseline (approx K/n_node_feat)")
+    p.add_argument("--embed-dim", type=int, default=32,
+                   help="Node embedding dim for the latent baselines' temporal "
+                        "encoder (adjacency dot-product / pair-MLP dimension). "
+                        "Default 32: a capacity probe showed smaller values "
+                        "cannot fit the training set and strawman the baseline.")
     p.add_argument("--dropout", type=float, default=0.1)
     # Training
     p.add_argument("--seeds", type=int, default=10)
