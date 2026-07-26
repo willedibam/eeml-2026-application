@@ -201,7 +201,15 @@ def _train_single(
                 f"val_f1={val_f1:.4f}  val_acc={val_acc:.4f}"
             )
 
-        if patience_counter >= config.patience:
+        # Never early-stop while the LR is still warming up. During warmup the
+        # LR is only (epoch/warmup)*lr, so progress is slow and noisy; with
+        # patience < warmup_epochs a run could halt before the LR ever reached
+        # full value, leaving spi_w at ~0. That produced catastrophic seed
+        # variance (e.g. one seed at F1 0.31 vs 0.96 for its siblings, best
+        # epoch 8 of a 60-epoch warmup) and made stronger group-lambda settings
+        # look worse than they are, since heavier regularisation slows early
+        # progress and triggered the failure more often.
+        if epoch > config.warmup_epochs and patience_counter >= config.patience:
             print(f"  Early stopping at epoch {epoch} (best={result.best_epoch})")
             break
 
