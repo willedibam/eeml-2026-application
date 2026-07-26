@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import copy
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 import torch
@@ -222,6 +224,90 @@ def _train_single(
         f"best_epoch={result.best_epoch}  time={result.train_seconds:.1f}s"
     )
     return result
+
+
+def stability_selection(
+    make_model: Callable[[], nn.Module],
+    train_data: list[Data],
+    val_data: list[Data],
+    config: TrainConfig,
+    *,
+    n_subsamples: int = 50,
+    subsample_frac: float = 0.5,
+    top_q: int = 10,
+    seed: int = 0,
+) -> dict[str, Any]:
+    """Stability selection for spi_w (Meinshausen & Buhlmann 2010).
+
+    Why this exists. The L1 / group-lasso terms are added to the loss and
+    differentiated, i.e. a *subgradient* method: spi_w is shrunk towards zero
+    but never exactly zero, and Adam's per-parameter scaling further distorts
+    the effective penalty. So "the top-weighted SPIs" is a statement about a
+    soft point estimate of a weakly-identified parameter -- fragile ground for
+    a scientific claim, especially with collinear SPIs where the winner among
+    near-duplicates is close to arbitrary.
+
+    Stability selection replaces the point estimate with a *frequency*: refit
+    on many random subsamples of the training set and record how often each
+    SPI lands in the top-q by |w|. An SPI selected in ~all subsamples is a
+    robust finding; one selected half the time is not, however large its mean
+    weight. This is the honest unit for the paper's interpretability claim,
+    and it degrades gracefully under collinearity (a collinear pair simply
+    splits its frequency).
+
+    Returns per-SPI selection frequency, sign consistency, and the fits' val
+    F1s (to confirm the subsampled fits are actually learning).
+    """
+    rng = np.random.default_rng(seed)
+    n = len(train_data)
+    n_sub = max(2, int(round(subsample_frac * n)))
+
+    counts: np.ndarray | None = None
+    sign_sum: np.ndarray | None = None
+    val_f1s: list[float] = []
+
+    # Subsampled fits are a diagnostic, not model selection: one restart and
+    # no test evaluation keeps the cost proportionate.
+    sub_config = copy.copy(config)
+    sub_config.restarts = 1
+
+    for b in range(n_subsamples):
+        idx = rng.choice(n, size=n_sub, replace=False)
+        subset = [train_data[i] for i in idx]
+
+        torch.manual_seed(seed * 100003 + b)
+        model = make_model()
+        res = _train_single(model, subset, val_data, val_data, sub_config)
+        w = res.learned_w
+        if w.size == 0:
+            raise ValueError("stability_selection requires a model with spi_w")
+
+        if counts is None:
+            counts = np.zeros(w.size)
+            sign_sum = np.zeros(w.size)
+
+        q = min(top_q, w.size)
+        top_idx = np.argsort(np.abs(w))[::-1][:q]
+        counts[top_idx] += 1.0
+        sign_sum[top_idx] += np.sign(w[top_idx])
+        val_f1s.append(res.best_val_f1)
+
+    freq = counts / n_subsamples
+    # Sign consistency among the fits that selected each SPI (1.0 = always
+    # same direction). A high-frequency SPI with inconsistent sign is a
+    # magnitude artifact, not a coherent effect.
+    with np.errstate(invalid="ignore", divide="ignore"):
+        sign_consistency = np.where(counts > 0, np.abs(sign_sum) / np.maximum(counts, 1), np.nan)
+
+    return {
+        "selection_frequency": freq.tolist(),
+        "sign_consistency": sign_consistency.tolist(),
+        "n_subsamples": n_subsamples,
+        "subsample_frac": subsample_frac,
+        "top_q": top_q,
+        "val_f1_mean": float(np.mean(val_f1s)),
+        "val_f1_std": float(np.std(val_f1s)),
+    }
 
 
 def train_model(
