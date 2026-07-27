@@ -153,6 +153,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--dropout", type=float, default=0.1)
     # Training
     p.add_argument("--seeds", type=int, default=10)
+    p.add_argument("--seed-offset", type=int, default=0,
+                   help="First seed index (seeds run seed_offset .. "
+                        "seed_offset+seeds-1). Lets a cluster array job shard "
+                        "disjoint seed ranges across tasks; merge by tag at "
+                        "analysis time.")
     p.add_argument("--device", default="cpu")
     p.add_argument("--batch-size", type=int, default=32)
     p.add_argument("--max-epochs", type=int, default=200)
@@ -491,7 +496,7 @@ def _run_standard(args: argparse.Namespace, data_dir: Path, output_dir: Path) ->
     )
 
     all_results: dict[str, list[TrainResult]] = defaultdict(list)
-    for seed in range(args.seeds):
+    for seed in range(args.seed_offset, args.seed_offset + args.seeds):
         print(f"\n--- Seed {seed} ---")
         torch.manual_seed(seed)
         np.random.seed(seed)
@@ -712,7 +717,7 @@ def _run_sample_efficiency(
 
         model_results: dict[str, list[TrainResult]] = defaultdict(list)
 
-        for seed in range(args.seeds):
+        for seed in range(args.seed_offset, args.seed_offset + args.seeds):
             print(f"\n  -- Seed {seed} --")
             torch.manual_seed(seed)
             np.random.seed(seed)
@@ -749,6 +754,7 @@ def _run_sample_efficiency(
         "n_node_features": F_n,
         "models_run": models_to_run,
         "seeds": args.seeds,
+        "seed_offset": args.seed_offset,
         "hyperparameters": {
             "lr": args.lr,
             "batch_size": args.batch_size,

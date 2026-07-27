@@ -1,0 +1,81 @@
+#!/bin/bash
+# Training array job (Gadi `normal`). Consumes per-instance dirs already
+# generated in ../mts-spi-study-cluster -- no data transfer.
+#
+# Parallelism note: src/model.py loops over graphs in Python, so one fit does
+# NOT use 48 cores. The efficient allocation is one fit per core, many fits in
+# flight -- hence xargs -P over the (n_train x seed) grid rather than threads.
+# BLAS threads are pinned to 1 for the same reason (48 single-threaded fits
+# beat 1 fit on 48 threads for this workload).
+#
+# Submit (Gadi caps array size at 10):
+#   qsub -J 0-0  -v DATA_DIR=...,CLASSES="a b c",TAG=r1  train.pbs   # validate
+#   qsub -J 0-4  -v DATA_DIR=...,CLASSES="a b c",TAG=r1  train.pbs   # 5 shards
+#
+# Each array task runs a disjoint shard of the seed range.
+#
+# TODO(verify on a login node): project code, storage flags, module name.
+
+#PBS -N eeml_train
+#PBS -P ql44
+#PBS -q normal
+#PBS -l ncpus=48
+#PBS -l mem=190GB
+#PBS -l walltime=06:00:00
+#PBS -l storage=scratch/ql44+gdata/ql44
+#PBS -l wd
+#PBS -j oe
+
+set -euo pipefail
+
+: "${DATA_DIR:?set DATA_DIR (path to generated per-instance dirs)}"
+: "${CLASSES:?set CLASSES (space-separated class dir names)}"
+TAG="${TAG:-run}"
+SEEDS="${SEEDS:-30}"
+N_TRAIN="${N_TRAIN:-20 50 100 200 400}"
+MODELS="${MODELS:-spi-mpnn fixed-spi correlation latent latent-directed node-only}"
+GROUP_LAMBDA="${GROUP_LAMBDA:-0.002}"
+SPI_GROUPS="${SPI_GROUPS:-literature}"
+NSHARDS="${NSHARDS:-5}"
+SHARD="${PBS_ARRAY_INDEX:-0}"
+
+module purge
+module load python3/3.12.1
+source .venv/bin/activate
+
+# One fit per core: keep every numeric library single-threaded.
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1
+export KMP_DUPLICATE_LIB_OK=TRUE
+unset CUDA_VISIBLE_DEVICES || true
+
+mkdir -p logs results
+echo "[INFO] shard ${SHARD}/${NSHARDS}  data=${DATA_DIR}  tag=${TAG}  $(date)"
+
+# Shard the seed range so array tasks are disjoint. Each seed is an
+# independent full sample-efficiency sweep; results merge by tag at analysis.
+run_seed() {
+    s="$1"
+    python -u -m src.run_pipeline \
+        --data-dir "${DATA_DIR}" \
+        --class-names ${CLASSES} \
+        --mode sample-efficiency \
+        --n-train ${N_TRAIN} \
+        --test-per-class 200 --val-per-class 100 \
+        --seeds 1 --seed-offset "${s}" \
+        --models ${MODELS} \
+        --group-lambda "${GROUP_LAMBDA}" \
+        --spi-groups "${SPI_GROUPS}" \
+        --device cpu \
+        --output-dir results \
+        --tag "${TAG}_s${s}" \
+        > "logs/${TAG}_s${s}.log" 2>&1
+}
+export -f run_seed
+export DATA_DIR CLASSES N_TRAIN MODELS GROUP_LAMBDA SPI_GROUPS TAG
+
+# seeds SHARD, SHARD+NSHARDS, SHARD+2*NSHARDS, ...
+seq "${SHARD}" "${NSHARDS}" $((SEEDS - 1)) \
+    | xargs -n1 -P "${PBS_NCPUS:-48}" -I{} bash -c 'run_seed {}'
+
+echo "[INFO] shard ${SHARD} done $(date)"
