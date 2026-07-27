@@ -48,17 +48,25 @@ mkdir -p results logs
 # inside an 8 h wall. JOBS caps concurrency -- memory, not CPU, is the limit,
 # since each process holds the whole SPI tensor (~0.4 GB for R0 at M=10,
 # ~2.1 GB for R1 at M=20).
-JOBS="${JOBS:-5}"
+JOBS="${JOBS:-8}"
 JOBFILE="$(mktemp)"
 
-queue () {  # tag, data, classes, labels_or_-, models, lambda, ntrain
-  local tag="$1" data="$2" cls="$3" lbl="$4" mdl="$5" lam="$6" nt="$7"
-  local extra=""
+queue_sharded () {  # same args; splits SEEDS into one single-seed job each
+  local tag="$1" data="$2" cls="$3" lbl="$4" mdl="$5" lam="$6" nt="$7" s
+  for ((s=0; s<SEEDS; s++)); do
+    queue "${tag}_s${s}" "$data" "$cls" "$lbl" "$mdl" "$lam" "$nt" "$s"
+  done
+}
+
+queue () {  # tag, data, classes, labels_or_-, models, lambda, ntrain [, seed_offset]
+  local tag="$1" data="$2" cls="$3" lbl="$4" mdl="$5" lam="$6" nt="$7" soff="${8:-}"
+  local extra="" nseeds="$SEEDS"
   [[ "$lbl" != "-" ]] && extra="--class-labels ${lbl//,/ }"
+  [[ -n "$soff" ]] && { extra="$extra --seed-offset $soff"; nseeds=1; }
   printf '%s\t%s\n' "$tag" \
     "python -u -m src.run_pipeline --data-dir $data --class-names ${cls//,/ } $extra \
      --mode sample-efficiency --n-train $nt --test-per-class 200 --val-per-class 100 \
-     --seeds $SEEDS --models ${mdl//,/ } --group-lambda $lam --spi-groups literature \
+     --seeds $nseeds --models ${mdl//,/ } --group-lambda $lam --spi-groups literature \
      --device cpu --tag $tag" >> "$JOBFILE"
 }
 
@@ -74,8 +82,8 @@ done
 # interpretability, or does a fair fully-latent model (temporal encoder over the
 # raw series, NRI/MTGNN-style) match it? If latent-directed ties at every n, the
 # accuracy argument is gone and the contribution is interpretability alone.
-queue r0_baselines "$R0" "$R0C" - spi-mpnn,fixed-spi,latent-directed,latent,node-only "$LAM" "20 50 100 200 400 700"
-queue r1_baselines "$R1" "$R1C" - spi-mpnn,fixed-spi,latent-directed,latent,node-only "$LAM" "20 50 100 200 400 700"
+queue_sharded r0_baselines "$R0" "$R0C" - spi-mpnn,fixed-spi,latent-directed,latent,node-only "$LAM" "20 50 100 200 400 700"
+queue_sharded r1_baselines "$R1" "$R1C" - spi-mpnn,fixed-spi,latent-directed,latent,node-only "$LAM" "20 50 100 200 400 700"
 queue r0_3class "$R0" "$R0C" -      spi-mpnn "$LAM" "100 400 700"
 queue r0_binary "$R0" "$R0C" 0,0,1  spi-mpnn "$LAM" "100 400 700"
 queue r1_3class "$R1" "$R1C" -      spi-mpnn "$LAM" "100 400 700"
@@ -97,10 +105,19 @@ done | xargs -d'\n' -P "$JOBS" -I{} bash -c '
 ' _ {}
 rm -f "$JOBFILE"
 
+# reassemble the sharded runs into one result each
+for b in r0_baselines r1_baselines; do
+  if ls results/sample_efficiency_${b}_s*_results.json >/dev/null 2>&1; then
+    PYTHONPATH=. python -m src.analysis results --merge "$b" >/dev/null 2>&1 \
+      && echo "### merged $b" >&2 || echo "### merge failed: $b" >&2
+  fi
+done
+
 echo
 echo "======================== FINAL REPORT ========================"
-for t in r0_baselines r1_baselines r0_3class r0_binary r1_3class r1_binary r1_fixed r1_gl0.002 r1_gl0.005 r1_gl0.02; do
+for t in r0_baselines_merged r1_baselines_merged r0_3class r0_binary r1_3class r1_binary r1_fixed r1_gl0.002 r1_gl0.005 r1_gl0.02; do
   f="results/sample_efficiency_${t}_results.json"
+  [[ -f "$f" ]] || f="results/${t}_results.json"
   [[ -f "$f" ]] || { echo "-- $t: MISSING"; continue; }
   echo
   echo "-------- $t --------"
