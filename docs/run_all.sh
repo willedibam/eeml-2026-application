@@ -63,6 +63,12 @@ for d in "$R0" "$R1"; do
   echo "  $d: $(find "$d" -name spi_mpis.npz 2>/dev/null | wc -l | tr -d ' ') complete, $(find "$d" -name spi_mpis.npz -size -1k 2>/dev/null | wc -l | tr -d ' ') truncated" >&2
 done
 
+# THE decisive baseline comparison: does the vocabulary buy anything beyond
+# interpretability, or does a fair fully-latent model (temporal encoder over the
+# raw series, NRI/MTGNN-style) match it? If latent-directed ties at every n, the
+# accuracy argument is gone and the contribution is interpretability alone.
+run r0_baselines "$R0" "$R0C" - spi-mpnn,fixed-spi,latent-directed,latent,node-only "$LAM" "20 50 100 200 400 700"
+run r1_baselines "$R1" "$R1C" - spi-mpnn,fixed-spi,latent-directed,latent,node-only "$LAM" "20 50 100 200 400 700"
 run r0_3class "$R0" "$R0C" -      spi-mpnn "$LAM" "100 400 700"
 run r0_binary "$R0" "$R0C" 0,0,1  spi-mpnn "$LAM" "100 400 700"
 run r1_3class "$R1" "$R1C" -      spi-mpnn "$LAM" "100 400 700"
@@ -74,7 +80,7 @@ done
 
 echo
 echo "======================== FINAL REPORT ========================"
-for t in r0_3class r0_binary r1_3class r1_binary r1_fixed r1_gl0.002 r1_gl0.005 r1_gl0.02; do
+for t in r0_baselines r1_baselines r0_3class r0_binary r1_3class r1_binary r1_fixed r1_gl0.002 r1_gl0.005 r1_gl0.02; do
   f="results/sample_efficiency_${t}_results.json"
   [[ -f "$f" ]] || { echo "-- $t: MISSING"; continue; }
   echo
@@ -87,6 +93,7 @@ for n in sorted(r['results'],key=int):
     print("  n=%-4s " % n + "  ".join(f"{m}={ms[m]['f1_mean']:.4f}+/-{ms[m]['f1_std']:.3f}" for m in ms))
 PY
   PYTHONPATH=. python docs/enrichment_2x2.py "$f" 2>/dev/null | grep -vE "^\s*$"
+  PYTHONPATH=. python docs/compare_resolutions.py "$f" 2>/dev/null | grep -E "^  (families|modules|axes) " 
 done
 echo
 echo "======================== END REPORT ========================"
