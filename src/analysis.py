@@ -534,6 +534,81 @@ def plot_training_curves(results: dict, out_dir: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Shard merging (cluster runs)
+# ---------------------------------------------------------------------------
+
+def merge_shards(paths: list[Path]) -> dict:
+    """Merge per-seed result shards from a sharded cluster run into one result.
+
+    docs/gadi/train.pbs shards the seed range across array tasks, so a 30-seed
+    run lands as 30 files (`<tag>_s0`, `<tag>_s1`, ...) each holding one seed.
+    Every plot and diagnostic here expects a single result with all seeds in
+    `per_seed`, so concatenate them and recompute the aggregates.
+
+    Shards must agree on the experiment: identical spi_names and
+    hyperparameters apart from `seed_offset`. Mismatches raise rather than
+    silently averaging across different experiments.
+    """
+    if not paths:
+        raise ValueError("no shards to merge")
+
+    shards = []
+    for p in sorted(paths):
+        with p.open() as f:
+            shards.append((p, json.load(f)))
+
+    base_path, base = shards[0]
+    base = json.loads(json.dumps(base))          # deep copy; don't mutate input
+    base_names = base.get("spi_names")
+    base_hp = {k: v for k, v in base.get("hyperparameters", {}).items()
+               if k != "seed_offset"}
+
+    for p, s in shards[1:]:
+        if s.get("spi_names") != base_names:
+            raise ValueError(f"{p.name}: spi_names differ from {base_path.name}")
+        hp = {k: v for k, v in s.get("hyperparameters", {}).items()
+              if k != "seed_offset"}
+        if hp != base_hp:
+            diff = {k for k in set(hp) | set(base_hp) if hp.get(k) != base_hp.get(k)}
+            raise ValueError(f"{p.name}: hyperparameters differ in {sorted(diff)}")
+
+    def _merge_models(dst: dict, srcs: list[dict]) -> None:
+        for model in dst:
+            per = list(dst[model].get("per_seed", []))
+            for s in srcs:
+                per.extend(s.get(model, {}).get("per_seed", []))
+            f1s = [r["test_f1"] for r in per]
+            accs = [r["test_acc"] for r in per]
+            dst[model].update({
+                "f1_mean": float(np.mean(f1s)), "f1_std": float(np.std(f1s)),
+                "acc_mean": float(np.mean(accs)), "acc_std": float(np.std(accs)),
+                "per_seed": per,
+            })
+
+    if base.get("mode") == "sample_efficiency":
+        for n, blk in base.get("results", {}).items():
+            _merge_models(blk["models"],
+                          [s["results"][n]["models"] for _, s in shards[1:]])
+    else:
+        _merge_models(base["models"], [s["models"] for _, s in shards[1:]])
+
+    n_seeds = len(next(iter(
+        (base["results"][next(iter(base["results"]))]["models"]
+         if base.get("mode") == "sample_efficiency" else base["models"])
+        .values()))["per_seed"])
+    base["seeds"] = n_seeds
+    base["merged_from"] = [p.name for p, _ in shards]
+    base.get("hyperparameters", {}).pop("seed_offset", None)
+    print(f"  [merge] {len(shards)} shards -> {n_seeds} seeds")
+    return base
+
+
+def find_shards(directory: Path, tag: str) -> list[Path]:
+    """Result shards for `tag`, i.e. <prefix>_<tag>_s<N>_results.json."""
+    return sorted(directory.glob(f"*{tag}_s*_results.json"))
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -566,11 +641,32 @@ def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(description="Analyze EEML results")
     p.add_argument("path", help="Results JSON or directory of JSONs")
     p.add_argument("--out-dir", help="Output directory for figures")
+    p.add_argument("--merge", metavar="TAG",
+                   help="Merge sharded cluster results before analysing: "
+                        "combines <dir>/*<TAG>_s*_results.json into one result "
+                        "(docs/gadi/train.pbs writes one file per seed shard). "
+                        "Writes <dir>/<TAG>_merged_results.json.")
     args = p.parse_args(argv)
 
     path = Path(args.path)
     if not path.is_absolute():
         path = project_root() / path
+
+    if args.merge:
+        if not path.is_dir():
+            print("--merge expects a directory"); sys.exit(1)
+        shards = find_shards(path, args.merge)
+        if not shards:
+            print(f"No shards matching *{args.merge}_s*_results.json in {path}")
+            sys.exit(1)
+        merged = merge_shards(shards)
+        out_path = path / f"{args.merge}_merged_results.json"
+        with out_path.open("w") as f:
+            json.dump(merged, f, indent=2)
+        print(f"  Saved {out_path.name}")
+        out = Path(args.out_dir) if args.out_dir else path / "figures"
+        _analyze(out_path, out)
+        return
 
     if path.is_dir():
         jsons = sorted(path.glob("*_results.json"))
