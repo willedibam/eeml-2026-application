@@ -1,0 +1,46 @@
+#!/bin/bash
+# Run the full regime battery as a PBS job.
+#
+# The battery is hours of compute; login nodes are shared and CPU-limited, so it
+# must not run there. Training is CPU-only by design (see docs/gadi/train.pbs
+# for the profiling that settled that), and the battery's runs are sequential
+# within one node -- so a modest ncpus is right, and BLAS is pinned to let each
+# fit use one core cleanly.
+#
+#   qsub -v R0=<dir>,R1=<dir>,SEEDS=5 docs/gadi/battery.pbs
+#
+# TODO(verify): project code and storage flags.
+
+#PBS -N eeml_battery
+#PBS -P ql44
+#PBS -q normal
+#PBS -l ncpus=12
+#PBS -l mem=48GB
+#PBS -l walltime=08:00:00
+#PBS -l storage=scratch/ql44+gdata/ql44
+#PBS -l wd
+#PBS -j oe
+
+set -uo pipefail
+
+R0="${R0:-/scratch/ql44/we2614/mts-spi-data/260727_r0_297}"
+R1="${R1:-/scratch/ql44/we2614/mts-spi-data/260726_r1_nonlinear}"
+SEEDS="${SEEDS:-5}"
+
+module purge
+module load python3/3.12.1
+export UV_CACHE_DIR="${UV_CACHE_DIR:-/scratch/ql44/we2614/uv-cache}"
+source .venv/bin/activate
+
+# One core per fit; the runs inside the battery are sequential, so extra BLAS
+# threads only add contention.
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1
+export KMP_DUPLICATE_LIB_OK=TRUE
+unset CUDA_VISIBLE_DEVICES || true
+
+mkdir -p logs results
+echo "[INFO] battery start $(date)  R0=$R0  R1=$R1  seeds=$SEEDS"
+bash docs/run_all.sh "$R0" "$R1" "$SEEDS" 2>&1 | tee "logs/battery_${PBS_JOBID%%.*}.txt"
+echo "[INFO] battery done $(date)"
+echo "[INFO] report: logs/battery_${PBS_JOBID%%.*}.txt"
