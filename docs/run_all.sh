@@ -42,17 +42,24 @@ LAM="${LAM:-0.01}"
 cd "$(dirname "$0")/.."
 mkdir -p results logs
 
-run () {  # tag, data, classes, labels_or_-, models, lambda, ntrain
+# Runs are independent and each is single-threaded (BLAS pinned to 1), so they
+# are executed in PARALLEL. Running them sequentially wastes the node: an
+# earlier version used 1 of 12 cores and would not have finished r0_baselines
+# inside an 8 h wall. JOBS caps concurrency -- memory, not CPU, is the limit,
+# since each process holds the whole SPI tensor (~0.4 GB for R0 at M=10,
+# ~2.1 GB for R1 at M=20).
+JOBS="${JOBS:-5}"
+JOBFILE="$(mktemp)"
+
+queue () {  # tag, data, classes, labels_or_-, models, lambda, ntrain
   local tag="$1" data="$2" cls="$3" lbl="$4" mdl="$5" lam="$6" nt="$7"
   local extra=""
   [[ "$lbl" != "-" ]] && extra="--class-labels ${lbl//,/ }"
-  echo "### running $tag ..." >&2
-  python -u -m src.run_pipeline --data-dir "$data" \
-    --class-names ${cls//,/ } $extra --mode sample-efficiency \
-    --n-train $nt --test-per-class 200 --val-per-class 100 \
-    --seeds "$SEEDS" --models ${mdl//,/ } --group-lambda "$lam" \
-    --spi-groups literature --device cpu --tag "$tag" \
-    > "logs/$tag.log" 2>&1 || echo "### $tag FAILED (see logs/$tag.log)" >&2
+  printf '%s\t%s\n' "$tag" \
+    "python -u -m src.run_pipeline --data-dir $data --class-names ${cls//,/ } $extra \
+     --mode sample-efficiency --n-train $nt --test-per-class 200 --val-per-class 100 \
+     --seeds $SEEDS --models ${mdl//,/ } --group-lambda $lam --spi-groups literature \
+     --device cpu --tag $tag" >> "$JOBFILE"
 }
 
 R0C="var-chain,var-fork,var-collider"
@@ -67,16 +74,28 @@ done
 # interpretability, or does a fair fully-latent model (temporal encoder over the
 # raw series, NRI/MTGNN-style) match it? If latent-directed ties at every n, the
 # accuracy argument is gone and the contribution is interpretability alone.
-run r0_baselines "$R0" "$R0C" - spi-mpnn,fixed-spi,latent-directed,latent,node-only "$LAM" "20 50 100 200 400 700"
-run r1_baselines "$R1" "$R1C" - spi-mpnn,fixed-spi,latent-directed,latent,node-only "$LAM" "20 50 100 200 400 700"
-run r0_3class "$R0" "$R0C" -      spi-mpnn "$LAM" "100 400 700"
-run r0_binary "$R0" "$R0C" 0,0,1  spi-mpnn "$LAM" "100 400 700"
-run r1_3class "$R1" "$R1C" -      spi-mpnn "$LAM" "100 400 700"
-run r1_binary "$R1" "$R1C" 0,0,1  spi-mpnn "$LAM" "100 400 700"
-run r1_fixed  "$R1" "$R1C" -      spi-mpnn,fixed-spi "$LAM" "100 400 700"
+queue r0_baselines "$R0" "$R0C" - spi-mpnn,fixed-spi,latent-directed,latent,node-only "$LAM" "20 50 100 200 400 700"
+queue r1_baselines "$R1" "$R1C" - spi-mpnn,fixed-spi,latent-directed,latent,node-only "$LAM" "20 50 100 200 400 700"
+queue r0_3class "$R0" "$R0C" -      spi-mpnn "$LAM" "100 400 700"
+queue r0_binary "$R0" "$R0C" 0,0,1  spi-mpnn "$LAM" "100 400 700"
+queue r1_3class "$R1" "$R1C" -      spi-mpnn "$LAM" "100 400 700"
+queue r1_binary "$R1" "$R1C" 0,0,1  spi-mpnn "$LAM" "100 400 700"
+queue r1_fixed  "$R1" "$R1C" -      spi-mpnn,fixed-spi "$LAM" "100 400 700"
 for gl in 0.002 0.005 0.02; do
-  run "r1_gl$gl" "$R1" "$R1C" - spi-mpnn "$gl" "400 700"
+  queue "r1_gl$gl" "$R1" "$R1C" - spi-mpnn "$gl" "400 700"
 done
+
+echo "### launching $(wc -l < "$JOBFILE") runs, $JOBS at a time" >&2
+cut -f2 "$JOBFILE" | nl -ba | while read -r i cmd; do
+  tag=$(sed -n "${i}p" "$JOBFILE" | cut -f1)
+  echo "$tag|$cmd"
+done | xargs -d'\n' -P "$JOBS" -I{} bash -c '
+  t="${1%%|*}"; c="${1#*|}"
+  echo "### start $t $(date +%H:%M)" >&2
+  eval "$c" > "logs/$t.log" 2>&1 && echo "### done  $t $(date +%H:%M)" >&2 \
+    || echo "### FAIL  $t (see logs/$t.log)" >&2
+' _ {}
+rm -f "$JOBFILE"
 
 echo
 echo "======================== FINAL REPORT ========================"

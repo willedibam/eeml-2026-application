@@ -15,7 +15,7 @@
 #PBS -P ql44
 #PBS -q normal
 #PBS -l ncpus=12
-#PBS -l mem=48GB
+#PBS -l mem=96GB
 #PBS -l walltime=08:00:00
 #PBS -l storage=scratch/ql44+gdata/ql44
 #PBS -l wd
@@ -41,6 +41,6 @@ unset CUDA_VISIBLE_DEVICES || true
 
 mkdir -p logs results
 echo "[INFO] battery start $(date)  R0=$R0  R1=$R1  seeds=$SEEDS"
-bash docs/run_all.sh "$R0" "$R1" "$SEEDS" 2>&1 | tee "logs/battery_${PBS_JOBID%%.*}.txt"
+JOBS="${JOBS:-5}" bash docs/run_all.sh "$R0" "$R1" "$SEEDS" 2>&1 | tee "logs/battery_${PBS_JOBID%%.*}.txt"
 echo "[INFO] battery done $(date)"
 echo "[INFO] report: logs/battery_${PBS_JOBID%%.*}.txt"
