@@ -27,7 +27,11 @@ class TrainConfig:
     l1_lambda: float = 0.0          # L1 on spi_w; 0 = disabled
     group_lambda: float = 0.0       # group lasso on SPI families; 0 = disabled
     spi_family_indices: list[list[int]] | None = None
-    group_size_norm: bool = True    # scale each family penalty by sqrt(|family|)
+    group_size_norm: bool = True    # scale each family penalty by sqrt(size)
+    # Per-group sizes used by the sqrt() weighting. None = raw member count
+    # (Yuan & Lin). Supply effective dimensions (graph_build.effective_group_dims)
+    # to stop redundant groups being over-penalised; see that docstring.
+    spi_family_sizes: list[float] | None = None
     use_cosine_decay: bool = True
     device: str = "cpu"
     # --- new options ---
@@ -161,16 +165,18 @@ def _train_single(
                 and config.spi_family_indices
                 and hasattr(model, "spi_w")
             ):
-                for idx in config.spi_family_indices:
+                for gi, idx in enumerate(config.spi_family_indices):
                     penalty = model.spi_w[idx].norm(2)
                     if config.group_size_norm:
+                        size = (config.spi_family_sizes[gi]
+                                if config.spi_family_sizes else len(idx))
                         # Yuan & Lin (2006): scale each group's penalty by
                         # sqrt(|g|) so families are penalised per-unit rather
                         # than by raw member count. Without this, large families
                         # (causal: 48 SPIs) are under-penalised and dominate the
                         # learned signature purely by size — the confound behind
                         # the "causal family carries 3.5x the L2 norm" claim.
-                        penalty = penalty * (len(idx) ** 0.5)
+                        penalty = penalty * (size ** 0.5)
                     loss = loss + config.group_lambda * penalty
 
             loss.backward()

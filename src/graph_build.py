@@ -278,6 +278,66 @@ def assign_spi_families(
     return family_names, family_indices
 
 
+def effective_group_dims(
+    tensors: list[np.ndarray],
+    group_indices: dict[str, list[int]],
+    *,
+    max_instances: int = 200,
+) -> dict[str, float]:
+    """Effective dimension of each SPI group: how many *independent* directions
+    its members actually span.
+
+    Uses the participation ratio of the eigenvalues of the group's correlation
+    matrix:
+
+        d_eff = (sum_i lambda_i)^2 / sum_i lambda_i^2
+
+    which equals p for p mutually orthogonal members, and 1 for p perfectly
+    collinear ones, interpolating in between.
+
+    Why this matters here. The group-lasso penalty lambda*sqrt(p_g)*||w_g||
+    follows Yuan & Lin (2006), whose derivation assumes the design within each
+    group is ORTHONORMAL -- they recommend orthonormalising each group first.
+    We cannot do that without destroying the thing being interpreted (w would
+    no longer index named SPIs). The vocabulary badly violates the assumption:
+    measured on the VAR data, the causal family has 48 members spanning ~4.7
+    directions (ratio 0.10) while distance has 5 spanning 2.6 (ratio 0.53). Using
+    sqrt(p) therefore over-penalises redundant families by sqrt(p/d_eff) --
+    ~3.1x for causal, ~2.5x for spectral -- which is why the recovered family
+    flips between distance and causal as lambda_g moves.
+
+    MUST be computed on TRAINING tensors only: the weighting is part of the
+    model, so deriving it from val/test would leak.
+
+    Returns {group_name: d_eff}, floats in [1, p_g].
+    """
+    rows = []
+    for t in tensors[:max_instances]:
+        M = t.shape[0]
+        off = ~np.eye(M, dtype=bool)
+        rows.append(t[off])
+    X = np.nan_to_num(np.concatenate(rows, axis=0), nan=0.0,
+                      posinf=0.0, neginf=0.0)
+
+    dims: dict[str, float] = {}
+    for name, idx in group_indices.items():
+        if len(idx) < 2:
+            dims[name] = float(len(idx))
+            continue
+        C = np.nan_to_num(np.corrcoef(X[:, idx].T), nan=0.0)
+        ev = np.linalg.eigvalsh(C)
+        ev = ev[ev > 1e-12]
+        if ev.size == 0:
+            dims[name] = 1.0
+            continue
+        dims[name] = float((ev.sum() ** 2) / (ev ** 2).sum())
+
+    print("[SPI-GROUPS] effective dims: "
+          + "  ".join(f"{k}={v:.1f}/{len(group_indices[k])}"
+                      for k, v in sorted(dims.items())))
+    return dims
+
+
 def literature_spi_modules(
     spi_names: list[str],
 ) -> tuple[list[str], dict[str, list[int]]]:

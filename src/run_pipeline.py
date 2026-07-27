@@ -67,6 +67,7 @@ from torch_geometric.data import Data
 from .graph_build import (
     SPIScaler,
     assign_spi_families,
+    effective_group_dims,
     empirical_spi_modules,
     literature_spi_modules,
     build_graph,
@@ -182,6 +183,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         "carried by pyspi (recommended when the recovered "
                         "group is the scientific claim). 'modules' = ad-hoc "
                         "clustering refit on this training split.")
+    p.add_argument("--group-size", choices=["raw", "effective"], default="raw",
+                   help="Size used in the group-lasso sqrt() weighting. 'raw' "
+                        "= member count (Yuan & Lin, assumes within-group "
+                        "orthonormality). 'effective' = participation ratio of "
+                        "the group's correlation eigenvalues, fitted on train "
+                        "only. The vocabulary is highly redundant (causal: 48 "
+                        "members spanning ~4.7 directions), so 'raw' "
+                        "over-penalises redundant groups ~3x and makes the "
+                        "recovered group flip with group-lambda.")
     p.add_argument("--no-group-size-norm", action="store_true",
                    help="Disable sqrt(|family|) weighting of the group-lasso "
                         "penalty (reproduces pre-fix runs; not recommended). "
@@ -479,6 +489,12 @@ def _run_standard(args: argparse.Namespace, data_dir: Path, output_dir: Path) ->
     test_data = [dataset[i] for i in test_idx]
     print(f"  Train: {len(train_data)}, Val: {len(val_data)}, Test: {len(test_data)}")
 
+    group_sizes = None
+    if args.group_size == "effective" and args.group_lambda > 0:
+        dims = effective_group_dims([scaled_spi[i] for i in train_idx],
+                                    spi_family_indices)
+        group_sizes = [dims[k] for k in spi_family_indices]
+
     config = TrainConfig(
         lr=args.lr,
         batch_size=args.batch_size,
@@ -488,6 +504,7 @@ def _run_standard(args: argparse.Namespace, data_dir: Path, output_dir: Path) ->
         l1_lambda=args.l1_lambda,
         group_lambda=args.group_lambda,
         spi_family_indices=list(spi_family_indices.values()) if args.group_lambda > 0 else None,
+        spi_family_sizes=group_sizes,
         group_size_norm=not args.no_group_size_norm,
         use_cosine_decay=not args.no_cosine_decay,
         warmup_epochs=args.warmup_epochs,
@@ -531,6 +548,7 @@ def _run_standard(args: argparse.Namespace, data_dir: Path, output_dir: Path) ->
             "top_d": args.top_d,
             "no_cosine_decay": args.no_cosine_decay,
             "spi_groups": args.spi_groups,
+            "group_size": args.group_size,
         },
         "models": {},
     }
@@ -672,6 +690,12 @@ def _run_sample_efficiency(
     M = _sample.num_nodes
     F_n = _sample.x.shape[1]
 
+    group_sizes = None
+    if args.group_size == "effective" and args.group_lambda > 0:
+        dims = effective_group_dims(
+            [raw_spi_retained[i] for i in largest_train_idx], spi_family_indices)
+        group_sizes = [dims[k] for k in spi_family_indices]
+
     config = TrainConfig(
         lr=args.lr,
         batch_size=args.batch_size,
@@ -681,6 +705,7 @@ def _run_sample_efficiency(
         l1_lambda=args.l1_lambda,
         group_lambda=args.group_lambda,
         spi_family_indices=list(spi_family_indices.values()) if args.group_lambda > 0 else None,
+        spi_family_sizes=group_sizes,
         group_size_norm=not args.no_group_size_norm,
         use_cosine_decay=not args.no_cosine_decay,
         warmup_epochs=args.warmup_epochs,
@@ -769,6 +794,7 @@ def _run_sample_efficiency(
             "top_d": args.top_d,
             "no_cosine_decay": args.no_cosine_decay,
             "spi_groups": args.spi_groups,
+            "group_size": args.group_size,
         },
         "results": results_by_n,
     }
