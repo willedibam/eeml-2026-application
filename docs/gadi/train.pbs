@@ -41,6 +41,9 @@ SHARD="${PBS_ARRAY_INDEX:-0}"
 
 module purge
 module load python3/3.12.1
+
+# uv venv; cache must live on /scratch, not $HOME (inode + space quota).
+export UV_CACHE_DIR="${UV_CACHE_DIR:-/scratch/ql44/we2614/uv-cache}"
 source .venv/bin/activate
 
 # One fit per core: keep every numeric library single-threaded.
