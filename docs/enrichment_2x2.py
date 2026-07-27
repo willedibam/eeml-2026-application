@@ -77,6 +77,26 @@ def analyse(path: Path, n_perm: int = 3000, n_key: str | None = None) -> None:
         print(f"  {lab:22} {mask.sum():3d}/{mask.size} SPIs  "
               f"{100*e['frac']:5.1f}% of |w|  {e['enrich']:5.2f}x  z={e['z']:5.1f}{flag}")
 
+    # Module-level enrichment: same permutation null, but at the resolution the
+    # vocabulary actually provides. "Module M06 is enriched 3x (z=5)" is a far
+    # more specific scientific statement than "directed statistics win", and it
+    # is the claim the pyspi programme is actually about. The binary axes above
+    # validate the machinery; these are the deliverable.
+    mods = np.array([LABELS.get(n, {}).get("module", "MXX") for n in names])
+    rows = []
+    for m in sorted(set(mods)):
+        mask = mods == m
+        if mask.sum() < 3:
+            continue
+        e = _enrich(W, mask, n_perm, rng)
+        rows.append((e["enrich"], e["z"], m, int(mask.sum()), e["frac"]))
+    rows.sort(reverse=True)
+    print("  -- literature modules (Cliff et al. 2023) --")
+    for enr, z, m, n_m, fr in rows[:5]:
+        flag = "  <<<" if enr > 1.5 and z > 3 else ""
+        print(f"  {m:22} {n_m:3d}/{mods.size} SPIs  {100*fr:5.1f}% of |w|  "
+              f"{enr:5.2f}x  z={z:5.1f}{flag}")
+
     top = np.argsort(W)[::-1][:6]
     print("  top-6: " + ", ".join(
         f"{names[i][:30]}{'[D]' if directed[i] else ''}{'[NL]' if nonlinear[i] else ''}"
