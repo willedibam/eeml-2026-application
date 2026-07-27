@@ -278,6 +278,29 @@ def assign_spi_families(
     return family_names, family_indices
 
 
+def spi_directedness(tensors: list[np.ndarray], *, max_instances: int = 200
+                     ) -> np.ndarray:
+    """Per-SPI asymmetry ||A - A^T|| / ||A||, measured on the data.
+
+    Whether a statistic is directed is a property of its OUTPUT, not of the
+    family we filed it under -- pyspi's `xpdist_euclidean_tau-10_min` is lagged
+    but computed symmetrically, and lands at 0.0 here. Measuring it removes the
+    hand taxonomy from the interpretability claim entirely.
+
+    This matters because the chain/fork motifs are Markov-equivalent under any
+    symmetric statistic (Verma & Pearl 1990), so directedness is not merely
+    useful for that task -- it is necessary. The fraction of learned |w| that
+    lands on directed SPIs is therefore a theory-backed readout, testable
+    against a permutation null (see analysis.report_directed_enrichment).
+
+    Returns (K,) in [0, 2]; ~0 = symmetric.
+    """
+    T = np.stack([t for t in tensors[:max_instances]])          # (N, M, M, K)
+    num = np.abs(T - np.transpose(T, (0, 2, 1, 3))).sum(axis=(0, 1, 2))
+    den = np.abs(T).sum(axis=(0, 1, 2)) + 1e-12
+    return num / den
+
+
 def effective_group_dims(
     tensors: list[np.ndarray],
     group_indices: dict[str, list[int]],

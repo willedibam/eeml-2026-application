@@ -68,6 +68,7 @@ from .graph_build import (
     SPIScaler,
     assign_spi_families,
     effective_group_dims,
+    spi_directedness,
     empirical_spi_modules,
     literature_spi_modules,
     build_graph,
@@ -152,6 +153,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         "Default 32: a capacity probe showed smaller values "
                         "cannot fit the training set and strawman the baseline.")
     p.add_argument("--dropout", type=float, default=0.1)
+    p.add_argument("--gate-edges", action="store_true",
+                   help="Gate edge features by spi_w: phi(w*E_ij) instead of "
+                        "phi(E_ij). Without it, phi sees every SPI regardless "
+                        "of w, so w selects only the topology and the learned "
+                        "sparsity does not correspond to what the model uses. "
+                        "With it, w_k=0 removes SPI k from the model entirely, "
+                        "making the recovered signature structurally meaningful.")
     # Training
     p.add_argument("--seeds", type=int, default=10)
     p.add_argument("--seed-offset", type=int, default=0,
@@ -167,13 +175,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--no-cosine-decay", action="store_true")
     # Regularisation
     p.add_argument("--l1-lambda", type=float, default=0.001)
-    # Re-tuned for the sqrt(|g|)-normalised group lasso. The old 0.02 was
-    # tuned for the UNnormalised penalty; with normalisation ON it is ~4-7x
-    # too strong (sqrt(48)=6.9 for causal, sqrt(52)=7.2 for spectral), which
-    # crushes spi_w and costs ~0.35 macro-F1 at n=100. Measured, single seed,
-    # n=100/class: (0.02, norm ON) 0.627 | (0.005, ON) 0.973 | (0.02, OFF)
-    # 0.908. Provisional -- confirm with a multi-seed sweep across n.
-    p.add_argument("--group-lambda", type=float, default=0.005)
+    # Tuned for the sqrt(|g|)-normalised group lasso on BOTH accuracy and the
+    # directed-enrichment readout, 5 seeds, n=400/class:
+    #   lambda   F1      %|w| directed   enrichment
+    #   0.002    0.9883      57%            1.75x
+    #   0.005    0.9923      66%            2.02x
+    #   0.010    0.9966      72%            2.20x   <- best on both
+    # An earlier value of 0.002 was selected on F1 at n=100 alone, the noisiest
+    # end of the curve; it is worse at n=400 and materially weakens the
+    # signature. Re-tune at K=297 (more groups changes the penalty scale).
+    p.add_argument("--group-lambda", type=float, default=0.01)
     p.add_argument("--spi-groups", choices=["families", "literature", "modules"],
                    default="families",
                    help="Group-lasso grouping. 'families' = hand-assigned "
@@ -321,7 +332,8 @@ def _make_model(
         dropout=args.dropout,
     )
     if name == "spi-mpnn":
-        return SPIEdgeMPNN(n_spi=K, top_d=args.top_d, **common)
+        return SPIEdgeMPNN(n_spi=K, top_d=args.top_d,
+                           gate_edges=args.gate_edges, **common)
     elif name == "correlation":
         return CorrelationMPNN(top_d=args.top_d, **common)
     elif name == "latent":
@@ -530,6 +542,8 @@ def _run_standard(args: argparse.Namespace, data_dir: Path, output_dir: Path) ->
         "n_spi": K,
         "spi_names": retained_names,
         "spi_families": {k: v for k, v in spi_family_indices.items()},
+        "spi_asymmetry": spi_directedness(
+            [scaled_spi[i] for i in train_idx]).tolist(),
         "n_train": len(train_data),
         "n_val": len(val_data),
         "n_test": len(test_data),
@@ -549,6 +563,7 @@ def _run_standard(args: argparse.Namespace, data_dir: Path, output_dir: Path) ->
             "no_cosine_decay": args.no_cosine_decay,
             "spi_groups": args.spi_groups,
             "group_size": args.group_size,
+            "gate_edges": args.gate_edges,
         },
         "models": {},
     }
@@ -773,6 +788,8 @@ def _run_sample_efficiency(
         "n_spi": K,
         "spi_names": retained_names,
         "spi_families": {k: v for k, v in spi_family_indices.items()},
+        "spi_asymmetry": spi_directedness(
+            [raw_spi_retained[i] for i in largest_train_idx]).tolist(),
         "n_val_per_class": n_val,
         "n_test_per_class": n_test,
         "n_nodes": M,
@@ -795,6 +812,7 @@ def _run_sample_efficiency(
             "no_cosine_decay": args.no_cosine_decay,
             "spi_groups": args.spi_groups,
             "group_size": args.group_size,
+            "gate_edges": args.gate_edges,
         },
         "results": results_by_n,
     }

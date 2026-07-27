@@ -381,7 +381,8 @@ def train_model(
                     m.reset_parameters()
             # spi_w and spi_b don't have reset_parameters — reinit manually
             if hasattr(model, "spi_w"):
-                nn.init.zeros_(model.spi_w)
+                nn.init.constant_(
+                    model.spi_w, 0.1 if getattr(model, "gate_edges", False) else 0.0)
                 nn.init.constant_(model.spi_b, -2.0)
 
         result = _train_single(model, train_data, val_data, test_data, config)

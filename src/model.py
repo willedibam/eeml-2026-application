@@ -174,11 +174,23 @@ class _SPIGraphBase(nn.Module):
         n_layers: int = 2,
         top_d: int = 3,
         dropout: float = 0.1,
+        gate_edges: bool = False,
     ):
         super().__init__()
         self.top_d = top_d
         self.n_spi = n_spi
         self.hidden = hidden
+        # When True, edge features are gated by spi_w before the edge network:
+        #     phi(w * E_ij)   instead of   phi(E_ij)
+        # Without gating, phi sees every SPI regardless of w, so w only chooses
+        # the topology while the discriminative content flows through phi. That
+        # makes "w is the statistical signature of the task" an empirical hope
+        # rather than a property of the model -- and measurably so: on the VAR
+        # data the top-3 |w| are symmetric statistics (gwtau, xpdist, dtw) even
+        # though chain-vs-fork provably requires directed information.
+        # With gating, an SPI with w_k = 0 is excluded from BOTH the topology
+        # and the messages, so the learned sparsity means what it claims.
+        self.gate_edges = gate_edges
 
         self.node_proj = nn.Linear(n_node_features, hidden)
         self.edge_net = nn.Sequential(
@@ -199,6 +211,12 @@ class _SPIGraphBase(nn.Module):
 
     def compute_adjacency(self, spi_tensor: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError
+
+    def _edge_features(self, spi_edges: torch.Tensor) -> torch.Tensor:
+        """phi(E_ij), or phi(w * E_ij) when gate_edges is on."""
+        if self.gate_edges and hasattr(self, "spi_w"):
+            spi_edges = spi_edges * self.spi_w
+        return self.edge_net(spi_edges)
 
     def _readout(
         self,
@@ -227,7 +245,7 @@ class _SPIGraphBase(nn.Module):
             spi_i = spi_dense[i, :M, :M, :]
             adj = self.compute_adjacency(spi_i)
             ei, ew = _sparsify(adj, self.top_d)
-            ea = self.edge_net(spi_i[ei[0], ei[1]])
+            ea = self._edge_features(spi_i[ei[0], ei[1]])
             all_ei.append(ei + offset)
             all_ea.append(ea)
             all_ew.append(ew)
@@ -260,7 +278,11 @@ class SPIEdgeMPNN(_SPIGraphBase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.spi_w = nn.Parameter(torch.zeros(self.n_spi))
+        # With gating, w=0 would zero the edge features too, leaving edge_net
+        # with no gradient at step 0. Start dense (all statistics admitted) and
+        # let the sparse-group lasso prune -- the standard lasso regime.
+        init = 0.1 if self.gate_edges else 0.0
+        self.spi_w = nn.Parameter(torch.full((self.n_spi,), init))
         self.spi_b = nn.Parameter(torch.tensor(-2.0))
 
     def compute_adjacency(self, spi_tensor: torch.Tensor) -> torch.Tensor:
