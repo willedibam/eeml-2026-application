@@ -180,11 +180,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     #   lambda   F1      %|w| directed   enrichment
     #   0.002    0.9883      57%            1.75x
     #   0.005    0.9923      66%            2.02x
-    #   0.010    0.9966      72%            2.20x   <- best on both
-    # An earlier value of 0.002 was selected on F1 at n=100 alone, the noisiest
-    # end of the curve; it is worse at n=400 and materially weakens the
-    # signature. Re-tune at K=297 (more groups changes the penalty scale).
-    p.add_argument("--group-lambda", type=float, default=0.01)
+    #   0.010    0.9966      72%            2.20x
+    # but lambda=0.01 is unstable at SMALL n (n=100: F1 0.799 +/- 0.143, and it
+    # fails tests/test_regression.py), while 0.002 was selected on n=100 alone
+    # and gives the weakest signature. 0.005 is the compromise that holds at
+    # both ends: n=100 F1 0.926, n=400 F1 0.992 with 2.02x enrichment.
+    # Re-tune at K=297 (more groups changes the penalty scale).
+    p.add_argument("--group-lambda", type=float, default=0.005)
     p.add_argument("--spi-groups", choices=["families", "literature", "modules"],
                    default="families",
                    help="Group-lasso grouping. 'families' = hand-assigned "
