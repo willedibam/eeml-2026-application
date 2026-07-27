@@ -1,0 +1,1784 @@
+{
+"anm": {
+"directed": true,
+"linear": true,
+"module": "M02",
+"nonlinear": true
+},
+"bary-sq_dtw_max": {
+"directed": false,
+"linear": false,
+"module": "M14",
+"nonlinear": true
+},
+"bary-sq_dtw_mean": {
+"directed": false,
+"linear": false,
+"module": "M09",
+"nonlinear": true
+},
+"bary-sq_euclidean_max": {
+"directed": false,
+"linear": false,
+"module": "M14",
+"nonlinear": true
+},
+"bary-sq_euclidean_mean": {
+"directed": false,
+"linear": false,
+"module": "M14",
+"nonlinear": true
+},
+"bary-sq_sgddtw_max": {
+"directed": false,
+"linear": false,
+"module": "M14",
+"nonlinear": true
+},
+"bary-sq_sgddtw_mean": {
+"directed": false,
+"linear": false,
+"module": "M09",
+"nonlinear": true
+},
+"bary_dtw_max": {
+"directed": false,
+"linear": false,
+"module": "M14",
+"nonlinear": true
+},
+"bary_dtw_mean": {
+"directed": false,
+"linear": false,
+"module": "M09",
+"nonlinear": true
+},
+"bary_euclidean_max": {
+"directed": false,
+"linear": false,
+"module": "M14",
+"nonlinear": true
+},
+"bary_euclidean_mean": {
+"directed": false,
+"linear": false,
+"module": "M14",
+"nonlinear": true
+},
+"bary_sgddtw_max": {
+"directed": false,
+"linear": false,
+"module": "M14",
+"nonlinear": true
+},
+"bary_sgddtw_mean": {
+"directed": false,
+"linear": false,
+"module": "M09",
+"nonlinear": true
+},
+"cce_gaussian": {
+"directed": true,
+"linear": true,
+"module": "M03",
+"nonlinear": true
+},
+"cce_kozachenko": {
+"directed": true,
+"linear": true,
+"module": "M03",
+"nonlinear": true
+},
+"cds": {
+"directed": true,
+"linear": false,
+"module": "M02",
+"nonlinear": true
+},
+"ce_gaussian": {
+"directed": true,
+"linear": true,
+"module": "M14",
+"nonlinear": true
+},
+"ce_kernel_W-0.5": {
+"directed": true,
+"linear": false,
+"module": "M14",
+"nonlinear": true
+},
+"ce_kozachenko": {
+"directed": true,
+"linear": true,
+"module": "M14",
+"nonlinear": true
+},
+"cohmag_multitaper_max_fs-1_fmin-0-25_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"cohmag_multitaper_max_fs-1_fmin-0_fmax-0-25": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"cohmag_multitaper_max_fs-1_fmin-0_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"cohmag_multitaper_mean_fs-1_fmin-0-25_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"cohmag_multitaper_mean_fs-1_fmin-0_fmax-0-25": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"cohmag_multitaper_mean_fs-1_fmin-0_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"coint_aeg_tstat_trend-c_autolag-aic_maxlag-10": {
+"directed": false,
+"linear": true,
+"module": "M13",
+"nonlinear": true
+},
+"coint_aeg_tstat_trend-ct_autolag-aic_maxlag-10": {
+"directed": false,
+"linear": true,
+"module": "M13",
+"nonlinear": true
+},
+"coint_aeg_tstat_trend-ct_autolag-bic_maxlag-10": {
+"directed": false,
+"linear": true,
+"module": "M13",
+"nonlinear": true
+},
+"coint_johansen_max_eig_stat_order-0_ardiff-1": {
+"directed": false,
+"linear": true,
+"module": "M13",
+"nonlinear": true
+},
+"coint_johansen_max_eig_stat_order-0_ardiff-10": {
+"directed": false,
+"linear": true,
+"module": "M13",
+"nonlinear": true
+},
+"coint_johansen_max_eig_stat_order-1_ardiff-1": {
+"directed": false,
+"linear": true,
+"module": "M13",
+"nonlinear": true
+},
+"coint_johansen_max_eig_stat_order-1_ardiff-10": {
+"directed": false,
+"linear": true,
+"module": "M13",
+"nonlinear": true
+},
+"coint_johansen_trace_stat_order-0_ardiff-1": {
+"directed": false,
+"linear": true,
+"module": "M13",
+"nonlinear": true
+},
+"coint_johansen_trace_stat_order-0_ardiff-10": {
+"directed": false,
+"linear": true,
+"module": "M13",
+"nonlinear": true
+},
+"coint_johansen_trace_stat_order-1_ardiff-1": {
+"directed": false,
+"linear": true,
+"module": "M13",
+"nonlinear": true
+},
+"coint_johansen_trace_stat_order-1_ardiff-10": {
+"directed": false,
+"linear": true,
+"module": "M13",
+"nonlinear": true
+},
+"corr_kendall_tau-1": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_kendall_tau-1-sq": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_kendall_tau-10": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_kendall_tau-10-sq": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_kendall_tau-2": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_kendall_tau-2-sq": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_kendall_tau-20": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_kendall_tau-20-sq": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_kendall_tau-3": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_kendall_tau-3-sq": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_kendall_tau-4": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_kendall_tau-4-sq": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_kendall_tau-5": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_kendall_tau-5-sq": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_pearson_tau-1": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_pearson_tau-1-sq": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_pearson_tau-10": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_pearson_tau-10-sq": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_pearson_tau-2": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_pearson_tau-2-sq": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_pearson_tau-20": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_pearson_tau-20-sq": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_pearson_tau-3": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_pearson_tau-3-sq": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_pearson_tau-4": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_pearson_tau-4-sq": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_pearson_tau-5": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_pearson_tau-5-sq": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_spearman_tau-1": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_spearman_tau-1-sq": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_spearman_tau-10": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_spearman_tau-10-sq": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_spearman_tau-2": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_spearman_tau-2-sq": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_spearman_tau-20": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_spearman_tau-20-sq": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_spearman_tau-3": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_spearman_tau-3-sq": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_spearman_tau-4": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_spearman_tau-4-sq": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_spearman_tau-5": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"corr_spearman_tau-5-sq": {
+"directed": false,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"cov-sq_EllipticEnvelope": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"cov-sq_EmpiricalCovariance": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"cov-sq_GraphicalLasso": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"cov-sq_GraphicalLassoCV": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"cov-sq_LedoitWolf": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"cov-sq_MinCovDet": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"cov-sq_OAS": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"cov-sq_ShrunkCovariance": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"cov_EllipticEnvelope": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"cov_EmpiricalCovariance": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"cov_GraphicalLasso": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"cov_GraphicalLassoCV": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"cov_LedoitWolf": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"cov_MinCovDet": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"cov_OAS": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"cov_ShrunkCovariance": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"dcoh_multitaper_max_fs-1_fmin-0-25_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"dcoh_multitaper_max_fs-1_fmin-0_fmax-0-25": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"dcoh_multitaper_max_fs-1_fmin-0_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"dcoh_multitaper_mean_fs-1_fmin-0-25_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"dcoh_multitaper_mean_fs-1_fmin-0_fmax-0-25": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"dcoh_multitaper_mean_fs-1_fmin-0_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"dcorr": {
+"directed": false,
+"linear": false,
+"module": "M14",
+"nonlinear": true
+},
+"dcorr_biased": {
+"directed": false,
+"linear": false,
+"module": "M14",
+"nonlinear": true
+},
+"ddtf_multitaper_max_fs-1_fmin-0-25_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"ddtf_multitaper_max_fs-1_fmin-0_fmax-0-25": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"ddtf_multitaper_max_fs-1_fmin-0_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"ddtf_multitaper_mean_fs-1_fmin-0-25_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"ddtf_multitaper_mean_fs-1_fmin-0_fmax-0-25": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"ddtf_multitaper_mean_fs-1_fmin-0_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"di_gaussian": {
+"directed": true,
+"linear": true,
+"module": "M03",
+"nonlinear": true
+},
+"di_kernel_W-0.5": {
+"directed": true,
+"linear": false,
+"module": "M03",
+"nonlinear": true
+},
+"di_kozachenko": {
+"directed": true,
+"linear": true,
+"module": "M03",
+"nonlinear": true
+},
+"dspli_multitaper_max_fs-1_fmin-0-25_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M07",
+"nonlinear": false
+},
+"dspli_multitaper_max_fs-1_fmin-0_fmax-0-25": {
+"directed": false,
+"linear": true,
+"module": "M07",
+"nonlinear": false
+},
+"dspli_multitaper_max_fs-1_fmin-0_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M07",
+"nonlinear": false
+},
+"dspli_multitaper_mean_fs-1_fmin-0-25_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"dspli_multitaper_mean_fs-1_fmin-0_fmax-0-25": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"dspli_multitaper_mean_fs-1_fmin-0_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"dswpli_multitaper_max_fs-1_fmin-0-25_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M07",
+"nonlinear": false
+},
+"dswpli_multitaper_max_fs-1_fmin-0_fmax-0-25": {
+"directed": false,
+"linear": true,
+"module": "M07",
+"nonlinear": false
+},
+"dswpli_multitaper_max_fs-1_fmin-0_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M07",
+"nonlinear": false
+},
+"dswpli_multitaper_mean_fs-1_fmin-0-25_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"dswpli_multitaper_mean_fs-1_fmin-0_fmax-0-25": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"dswpli_multitaper_mean_fs-1_fmin-0_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"dtf_multitaper_max_fs-1_fmin-0-25_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"dtf_multitaper_max_fs-1_fmin-0_fmax-0-25": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"dtf_multitaper_max_fs-1_fmin-0_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"dtf_multitaper_mean_fs-1_fmin-0-25_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"dtf_multitaper_mean_fs-1_fmin-0_fmax-0-25": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"dtf_multitaper_mean_fs-1_fmin-0_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"dtw": {
+"directed": false,
+"linear": false,
+"module": "M10",
+"nonlinear": true
+},
+"dtw_constraint-itakura": {
+"directed": false,
+"linear": false,
+"module": "M10",
+"nonlinear": true
+},
+"dtw_constraint-sakoe-chiba_radius-auto": {
+"directed": false,
+"linear": false,
+"module": "M10",
+"nonlinear": true
+},
+"gc_gaussian_k-1_kt-1_l-1_lt-1": {
+"directed": true,
+"linear": true,
+"module": "M05",
+"nonlinear": true
+},
+"gc_gaussian_k-max-10_tau-max-2": {
+"directed": true,
+"linear": true,
+"module": "M05",
+"nonlinear": true
+},
+"gd_multitaper_delay_fs-1_fmin-0-25_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M01",
+"nonlinear": false
+},
+"gd_multitaper_delay_fs-1_fmin-0_fmax-0-25": {
+"directed": true,
+"linear": true,
+"module": "M01",
+"nonlinear": false
+},
+"gd_multitaper_delay_fs-1_fmin-0_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M01",
+"nonlinear": false
+},
+"gpdcoh_multitaper_max_fs-1_fmin-0-25_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"gpdcoh_multitaper_max_fs-1_fmin-0_fmax-0-25": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"gpdcoh_multitaper_max_fs-1_fmin-0_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"gpdcoh_multitaper_mean_fs-1_fmin-0-25_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"gpdcoh_multitaper_mean_fs-1_fmin-0_fmax-0-25": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"gpdcoh_multitaper_mean_fs-1_fmin-0_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"gwtau": {
+"directed": false,
+"linear": false,
+"module": "MXX",
+"nonlinear": true
+},
+"icoh_multitaper_max_fs-1_fmin-0-25_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"icoh_multitaper_max_fs-1_fmin-0_fmax-0-25": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"icoh_multitaper_max_fs-1_fmin-0_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"icoh_multitaper_mean_fs-1_fmin-0-25_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"icoh_multitaper_mean_fs-1_fmin-0_fmax-0-25": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"icoh_multitaper_mean_fs-1_fmin-0_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"ids": {
+"directed": false,
+"linear": false,
+"module": "MXX",
+"nonlinear": true
+},
+"je_gaussian": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": true
+},
+"je_kernel_W-0.5": {
+"directed": false,
+"linear": false,
+"module": "M14",
+"nonlinear": true
+},
+"je_kozachenko": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": true
+},
+"kendalltau": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": true
+},
+"kendalltau-sq": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": true
+},
+"lcss": {
+"directed": false,
+"linear": false,
+"module": "M10",
+"nonlinear": true
+},
+"lcss_constraint-itakura": {
+"directed": false,
+"linear": false,
+"module": "M10",
+"nonlinear": true
+},
+"lcss_constraint-sakoe-chiba": {
+"directed": false,
+"linear": false,
+"module": "M10",
+"nonlinear": true
+},
+"lmfit_BayesianRidge": {
+"directed": true,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"lmfit_ElasticNet": {
+"directed": true,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"lmfit_Lasso": {
+"directed": true,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"lmfit_Ridge": {
+"directed": true,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"lmfit_SGDRegressor": {
+"directed": true,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"mi_gaussian": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": true
+},
+"mi_kernel_W-0.25": {
+"directed": false,
+"linear": false,
+"module": "M14",
+"nonlinear": true
+},
+"mi_kraskov_NN-4": {
+"directed": false,
+"linear": false,
+"module": "M14",
+"nonlinear": true
+},
+"mi_kraskov_NN-4_DCE": {
+"directed": false,
+"linear": false,
+"module": "M14",
+"nonlinear": true
+},
+"pdcoh_multitaper_max_fs-1_fmin-0-25_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"pdcoh_multitaper_max_fs-1_fmin-0_fmax-0-25": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"pdcoh_multitaper_max_fs-1_fmin-0_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"pdcoh_multitaper_mean_fs-1_fmin-0-25_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"pdcoh_multitaper_mean_fs-1_fmin-0_fmax-0-25": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"pdcoh_multitaper_mean_fs-1_fmin-0_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"pdist_braycurtis": {
+"directed": false,
+"linear": false,
+"module": "MXX",
+"nonlinear": true
+},
+"pdist_canberra": {
+"directed": false,
+"linear": false,
+"module": "MXX",
+"nonlinear": true
+},
+"pdist_chebyshev": {
+"directed": false,
+"linear": false,
+"module": "MXX",
+"nonlinear": true
+},
+"pdist_cityblock": {
+"directed": false,
+"linear": false,
+"module": "MXX",
+"nonlinear": true
+},
+"pdist_cosine": {
+"directed": false,
+"linear": false,
+"module": "MXX",
+"nonlinear": true
+},
+"pdist_euclidean": {
+"directed": false,
+"linear": false,
+"module": "MXX",
+"nonlinear": true
+},
+"pec": {
+"directed": false,
+"linear": true,
+"module": "M11",
+"nonlinear": false
+},
+"pec_log": {
+"directed": false,
+"linear": true,
+"module": "M11",
+"nonlinear": false
+},
+"pec_orth": {
+"directed": false,
+"linear": true,
+"module": "M11",
+"nonlinear": false
+},
+"pec_orth_abs": {
+"directed": false,
+"linear": true,
+"module": "M11",
+"nonlinear": false
+},
+"pec_orth_log": {
+"directed": false,
+"linear": true,
+"module": "M11",
+"nonlinear": false
+},
+"pec_orth_log_abs": {
+"directed": false,
+"linear": true,
+"module": "M11",
+"nonlinear": false
+},
+"phase_multitaper_max_fs-1_fmin-0-25_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M10",
+"nonlinear": false
+},
+"phase_multitaper_max_fs-1_fmin-0_fmax-0-25": {
+"directed": false,
+"linear": true,
+"module": "M10",
+"nonlinear": false
+},
+"phase_multitaper_max_fs-1_fmin-0_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M10",
+"nonlinear": false
+},
+"phase_multitaper_mean_fs-1_fmin-0-25_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M01",
+"nonlinear": false
+},
+"phase_multitaper_mean_fs-1_fmin-0_fmax-0-25": {
+"directed": false,
+"linear": true,
+"module": "M01",
+"nonlinear": false
+},
+"phase_multitaper_mean_fs-1_fmin-0_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M01",
+"nonlinear": false
+},
+"phi_Geo_t-1_norm-0": {
+"directed": false,
+"linear": true,
+"module": "M05",
+"nonlinear": true
+},
+"phi_Geo_t-1_norm-1": {
+"directed": false,
+"linear": true,
+"module": "M05",
+"nonlinear": true
+},
+"phi_star_t-1_norm-0": {
+"directed": false,
+"linear": true,
+"module": "M05",
+"nonlinear": true
+},
+"phi_star_t-1_norm-1": {
+"directed": false,
+"linear": true,
+"module": "M05",
+"nonlinear": true
+},
+"pli_multitaper_max_fs-1_fmin-0-25_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M07",
+"nonlinear": false
+},
+"pli_multitaper_max_fs-1_fmin-0_fmax-0-25": {
+"directed": false,
+"linear": true,
+"module": "M07",
+"nonlinear": false
+},
+"pli_multitaper_max_fs-1_fmin-0_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M07",
+"nonlinear": false
+},
+"pli_multitaper_mean_fs-1_fmin-0-25_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M01",
+"nonlinear": false
+},
+"pli_multitaper_mean_fs-1_fmin-0_fmax-0-25": {
+"directed": false,
+"linear": true,
+"module": "M01",
+"nonlinear": false
+},
+"pli_multitaper_mean_fs-1_fmin-0_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"plv_multitaper_max_fs-1_fmin-0-25_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M10",
+"nonlinear": false
+},
+"plv_multitaper_max_fs-1_fmin-0_fmax-0-25": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"plv_multitaper_max_fs-1_fmin-0_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"plv_multitaper_mean_fs-1_fmin-0-25_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M10",
+"nonlinear": false
+},
+"plv_multitaper_mean_fs-1_fmin-0_fmax-0-25": {
+"directed": false,
+"linear": true,
+"module": "M10",
+"nonlinear": false
+},
+"plv_multitaper_mean_fs-1_fmin-0_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M10",
+"nonlinear": false
+},
+"ppc_multitaper_max_fs-1_fmin-0-25_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"ppc_multitaper_max_fs-1_fmin-0_fmax-0-25": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"ppc_multitaper_max_fs-1_fmin-0_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"ppc_multitaper_mean_fs-1_fmin-0-25_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"ppc_multitaper_mean_fs-1_fmin-0_fmax-0-25": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"ppc_multitaper_mean_fs-1_fmin-0_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M12",
+"nonlinear": false
+},
+"prec-sq_EllipticEnvelope": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"prec-sq_EmpiricalCovariance": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"prec-sq_GraphicalLasso": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"prec-sq_GraphicalLassoCV": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"prec-sq_LedoitWolf": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"prec-sq_MinCovDet": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"prec-sq_OAS": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"prec-sq_ShrunkCovariance": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"prec_EllipticEnvelope": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"prec_EmpiricalCovariance": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"prec_GraphicalLasso": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"prec_GraphicalLassoCV": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"prec_LedoitWolf": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"prec_MinCovDet": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"prec_OAS": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"prec_ShrunkCovariance": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"psi_multitaper_mean_fs-1_fmin-0-25_fmax-0-5": {
+"directed": true,
+"linear": false,
+"module": "M01",
+"nonlinear": false
+},
+"psi_multitaper_mean_fs-1_fmin-0_fmax-0-25": {
+"directed": true,
+"linear": false,
+"module": "M01",
+"nonlinear": false
+},
+"psi_multitaper_mean_fs-1_fmin-0_fmax-0-5": {
+"directed": true,
+"linear": false,
+"module": "M01",
+"nonlinear": false
+},
+"psi_wavelet_max_fs-1_fmin-0-25_fmax-0-5_max": {
+"directed": false,
+"linear": false,
+"module": "M08",
+"nonlinear": false
+},
+"psi_wavelet_max_fs-1_fmin-0_fmax-0-25_max": {
+"directed": false,
+"linear": false,
+"module": "M08",
+"nonlinear": false
+},
+"psi_wavelet_max_fs-1_fmin-0_fmax-0-5_max": {
+"directed": false,
+"linear": false,
+"module": "M08",
+"nonlinear": false
+},
+"psi_wavelet_mean_fs-1_fmin-0-25_fmax-0-5_mean": {
+"directed": false,
+"linear": false,
+"module": "M08",
+"nonlinear": false
+},
+"reci": {
+"directed": true,
+"linear": false,
+"module": "M14",
+"nonlinear": true
+},
+"sgc_nonparametric_max_fs-1_fmin-0-25_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"sgc_nonparametric_max_fs-1_fmin-0_fmax-0-25": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"sgc_nonparametric_max_fs-1_fmin-0_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"sgc_nonparametric_mean_fs-1_fmin-0-25_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"sgc_nonparametric_mean_fs-1_fmin-0_fmax-0-25": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"sgc_nonparametric_mean_fs-1_fmin-0_fmax-0-5": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"sgc_parametric_max_fs-1_fmin-0-25_fmax-0-5_order-1": {
+"directed": true,
+"linear": true,
+"module": "M05",
+"nonlinear": false
+},
+"sgc_parametric_max_fs-1_fmin-0-25_fmax-0-5_order-20": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"sgc_parametric_max_fs-1_fmin-0-25_fmax-0-5_order-None": {
+"directed": true,
+"linear": true,
+"module": "M05",
+"nonlinear": false
+},
+"sgc_parametric_max_fs-1_fmin-0_fmax-0-25_order-1": {
+"directed": true,
+"linear": true,
+"module": "M05",
+"nonlinear": false
+},
+"sgc_parametric_max_fs-1_fmin-0_fmax-0-25_order-20": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"sgc_parametric_max_fs-1_fmin-0_fmax-0-25_order-None": {
+"directed": true,
+"linear": true,
+"module": "M05",
+"nonlinear": false
+},
+"sgc_parametric_max_fs-1_fmin-1e-05_fmax-0-5_order-1": {
+"directed": true,
+"linear": true,
+"module": "M05",
+"nonlinear": false
+},
+"sgc_parametric_max_fs-1_fmin-1e-05_fmax-0-5_order-20": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"sgc_parametric_max_fs-1_fmin-1e-05_fmax-0-5_order-None": {
+"directed": true,
+"linear": true,
+"module": "M05",
+"nonlinear": false
+},
+"sgc_parametric_mean_fs-1_fmin-0-25_fmax-0-5_order-1": {
+"directed": true,
+"linear": true,
+"module": "M05",
+"nonlinear": false
+},
+"sgc_parametric_mean_fs-1_fmin-0-25_fmax-0-5_order-20": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"sgc_parametric_mean_fs-1_fmin-0-25_fmax-0-5_order-None": {
+"directed": true,
+"linear": true,
+"module": "M05",
+"nonlinear": false
+},
+"sgc_parametric_mean_fs-1_fmin-0_fmax-0-25_order-1": {
+"directed": true,
+"linear": true,
+"module": "M05",
+"nonlinear": false
+},
+"sgc_parametric_mean_fs-1_fmin-0_fmax-0-25_order-20": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"sgc_parametric_mean_fs-1_fmin-0_fmax-0-25_order-None": {
+"directed": true,
+"linear": true,
+"module": "M05",
+"nonlinear": false
+},
+"sgc_parametric_mean_fs-1_fmin-0_fmax-0-5_order-None": {
+"directed": true,
+"linear": true,
+"module": "M05",
+"nonlinear": false
+},
+"sgc_parametric_mean_fs-1_fmin-1e-05_fmax-0-5_order-1": {
+"directed": true,
+"linear": true,
+"module": "M05",
+"nonlinear": false
+},
+"sgc_parametric_mean_fs-1_fmin-1e-05_fmax-0-5_order-20": {
+"directed": true,
+"linear": true,
+"module": "M06",
+"nonlinear": false
+},
+"si_gaussian_k-1": {
+"directed": false,
+"linear": true,
+"module": "M05",
+"nonlinear": true
+},
+"si_kernel_W-0.5_k-1": {
+"directed": false,
+"linear": false,
+"module": "M14",
+"nonlinear": true
+},
+"si_kozachenko_k-1": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": true
+},
+"spearmanr": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": true
+},
+"spearmanr-sq": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": true
+},
+"te_kernel_W-0.25_k-1": {
+"directed": true,
+"linear": false,
+"module": "M14",
+"nonlinear": true
+},
+"te_kraskov_NN-4_DCE_k-1_kt-1_l-1_lt-1": {
+"directed": true,
+"linear": false,
+"module": "M04",
+"nonlinear": true
+},
+"te_kraskov_NN-4_DCE_k-2_kt-1_l-1_lt-1": {
+"directed": true,
+"linear": false,
+"module": "M04",
+"nonlinear": true
+},
+"te_kraskov_NN-4_k-1_kt-1_l-1_lt-1": {
+"directed": true,
+"linear": false,
+"module": "M04",
+"nonlinear": true
+},
+"te_symbolic_k-10_kt-1_l-1_lt-1": {
+"directed": true,
+"linear": false,
+"module": "M05",
+"nonlinear": true
+},
+"te_symbolic_k-1_kt-1_l-1_lt-1": {
+"directed": true,
+"linear": false,
+"module": "M05",
+"nonlinear": true
+},
+"tlmi_gaussian": {
+"directed": true,
+"linear": true,
+"module": "M14",
+"nonlinear": true
+},
+"tlmi_kernel_W-0.25": {
+"directed": true,
+"linear": false,
+"module": "M14",
+"nonlinear": true
+},
+"tlmi_kraskov_NN-4": {
+"directed": true,
+"linear": false,
+"module": "M14",
+"nonlinear": true
+},
+"tlmi_kraskov_NN-4_DCE": {
+"directed": true,
+"linear": false,
+"module": "M14",
+"nonlinear": true
+},
+"wpli_multitaper_max_fs-1_fmin-0-25_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M07",
+"nonlinear": false
+},
+"wpli_multitaper_max_fs-1_fmin-0_fmax-0-25": {
+"directed": false,
+"linear": true,
+"module": "M07",
+"nonlinear": false
+},
+"wpli_multitaper_max_fs-1_fmin-0_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M07",
+"nonlinear": false
+},
+"wpli_multitaper_mean_fs-1_fmin-0-25_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M01",
+"nonlinear": false
+},
+"wpli_multitaper_mean_fs-1_fmin-0_fmax-0-25": {
+"directed": false,
+"linear": true,
+"module": "M01",
+"nonlinear": false
+},
+"wpli_multitaper_mean_fs-1_fmin-0_fmax-0-5": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"xcorr-sq_max_sig-True": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"xcorr-sq_mean_sig-False": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"xcorr-sq_mean_sig-True": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"xcorr_max_sig-True": {
+"directed": false,
+"linear": true,
+"module": "M10",
+"nonlinear": false
+},
+"xcorr_mean_sig-False": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"xcorr_mean_sig-True": {
+"directed": false,
+"linear": true,
+"module": "M14",
+"nonlinear": false
+},
+"xme_gaussian_k1": {
+"directed": true,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"xme_gaussian_k10": {
+"directed": true,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"xme_kernel_W-0.5_k1": {
+"directed": true,
+"linear": false,
+"module": "MXX",
+"nonlinear": true
+},
+"xme_kernel_W-0.5_k10": {
+"directed": true,
+"linear": false,
+"module": "MXX",
+"nonlinear": true
+},
+"xme_kozachenko_k1": {
+"directed": true,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"xme_kozachenko_k10": {
+"directed": true,
+"linear": true,
+"module": "MXX",
+"nonlinear": false
+},
+"xpdist_euclidean_tau-1_mean_rmse": {
+"directed": false,
+"linear": false,
+"module": "MXX",
+"nonlinear": true
+},
+"xpdist_euclidean_tau-1_min_rmse": {
+"directed": false,
+"linear": false,
+"module": "MXX",
+"nonlinear": true
+}
+}
