@@ -278,6 +278,47 @@ def assign_spi_families(
     return family_names, family_indices
 
 
+def literature_spi_modules(
+    spi_names: list[str],
+) -> tuple[list[str], dict[str, list[int]]]:
+    """Group SPIs by the PUBLISHED modules of Cliff et al. (2023).
+
+    pyspi tags every SPI with a module label (M01-M14) from the empirical
+    modular decomposition in "Unifying pairwise interactions in complex
+    dynamics"; MXX marks SPIs added to the fork that are not in the paper.
+    Those labels are derived from measured inter-SPI similarity across a large
+    dataset corpus, so they are both data-driven AND externally validated --
+    strictly better grounded than either the hand-assigned families here
+    (which do not match the empirical structure on VAR, ARI 0.06) or an
+    ad-hoc clustering refit per dataset.
+
+    Prefer this grouping when the recovered group is the scientific claim: it
+    lets the result be stated in the literature's own vocabulary rather than
+    in categories invented for this repo.
+
+    The mapping is cached in src/spi_modules.json (generated from pyspi), so
+    this repo does not need pyspi installed. SPIs absent from the cache are
+    assigned "MXX".
+    """
+    path = Path(__file__).parent / "spi_modules.json"
+    if not path.exists():
+        raise FileNotFoundError(
+            f"{path} missing; regenerate it from pyspi (see docs)."
+        )
+    table = load_json(path)
+
+    module_names = [table.get(n, "MXX") for n in spi_names]
+    module_indices: dict[str, list[int]] = {}
+    for i, m in enumerate(module_names):
+        module_indices.setdefault(m, []).append(i)
+
+    n_unmapped = sum(1 for n in spi_names if n not in table)
+    sizes = {k: len(v) for k, v in sorted(module_indices.items())}
+    print(f"[SPI-MODULES] literature modules {sizes}"
+          + (f"  ({n_unmapped} unmapped -> MXX)" if n_unmapped else ""))
+    return module_names, module_indices
+
+
 def empirical_spi_modules(
     tensors: list[np.ndarray],
     n_modules: int = 6,

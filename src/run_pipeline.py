@@ -54,9 +54,7 @@ The scaler is fit on the training subset for each n_train independently.
 from __future__ import annotations
 
 import argparse
-import json
 import sys
-import time
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -66,11 +64,11 @@ import torch
 from sklearn.model_selection import train_test_split
 from torch_geometric.data import Data
 
-from .features import node_features
 from .graph_build import (
     SPIScaler,
     assign_spi_families,
     empirical_spi_modules,
+    literature_spi_modules,
     build_graph,
     filter_spi_dimensions,
     load_spi_names,
@@ -90,7 +88,7 @@ from .model import (
     SubsetSPIMPNN,
 )
 from .train import TrainConfig, TrainResult, train_model
-from .utils import dump_json, load_json, project_root, to_relative
+from .utils import dump_json, project_root, to_relative
 
 # Fixed seeds for data splitting — never change these mid-experiment
 _SPLIT_SEED = 42   # stratified split (standard mode)
@@ -170,15 +168,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     # n=100/class: (0.02, norm ON) 0.627 | (0.005, ON) 0.973 | (0.02, OFF)
     # 0.908. Provisional -- confirm with a multi-seed sweep across n.
     p.add_argument("--group-lambda", type=float, default=0.005)
-    p.add_argument("--spi-groups", choices=["families", "modules"],
+    p.add_argument("--spi-groups", choices=["families", "literature", "modules"],
                    default="families",
                    help="Group-lasso grouping. 'families' = hand-assigned "
-                        "pyspi taxonomy (default). 'modules' = data-driven "
-                        "clusters of SPI output covariance, fitted on the "
-                        "training split only. The hand families do not match "
-                        "the empirical structure on VAR (ARI 0.06), so "
-                        "'modules' is the defensible choice when the recovered "
-                        "group is the scientific claim.")
+                        "taxonomy in graph_build (default; does NOT match the "
+                        "empirical structure on VAR, ARI 0.06). 'literature' = "
+                        "the published Cliff et al. (2023) modules M01-M14 "
+                        "carried by pyspi (recommended when the recovered "
+                        "group is the scientific claim). 'modules' = ad-hoc "
+                        "clustering refit on this training split.")
     p.add_argument("--no-group-size-norm", action="store_true",
                    help="Disable sqrt(|family|) weighting of the group-lasso "
                         "penalty (reproduces pre-fix runs; not recommended). "
@@ -457,7 +455,9 @@ def _run_standard(args: argparse.Namespace, data_dir: Path, output_dir: Path) ->
         print("[ERROR] All SPI dimensions dropped"); return
 
     scaled_spi, _ = _scale_tensors(raw_spi, list(train_idx), retained_indices)
-    if args.spi_groups == "modules":
+    if args.spi_groups == "literature":
+        _, spi_family_indices = literature_spi_modules(retained_names)
+    elif args.spi_groups == "modules":
         _, spi_family_indices = empirical_spi_modules(
             [scaled_spi[i] for i in train_idx]
         )
@@ -637,7 +637,9 @@ def _run_sample_efficiency(
         print("[ERROR] All SPI dimensions dropped"); return
 
     raw_spi_retained = [t[:, :, retained_indices] for t in raw_spi]
-    if args.spi_groups == "modules":
+    if args.spi_groups == "literature":
+        _, spi_family_indices = literature_spi_modules(retained_names)
+    elif args.spi_groups == "modules":
         # Fit on the largest training pool only (never val/test).
         _, spi_family_indices = empirical_spi_modules(
             [raw_spi_retained[i] for i in largest_train_idx]
