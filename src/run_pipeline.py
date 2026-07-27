@@ -123,6 +123,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Class directory names under data-dir, in label order. "
              "E.g.: chain star ring random"
     )
+    p.add_argument("--class-labels", type=int, nargs="+", default=None,
+                   help="Override the default 0..N-1 label per --class-names "
+                        "entry, so classes can be merged. E.g. "
+                        "--class-names chain fork collider --class-labels 0 0 1 "
+                        "gives the binary 'collider vs rest' task. That task is "
+                        "solvable by SYMMETRIC statistics (a collider's parents "
+                        "are independent), unlike the 3-class task, so it is the "
+                        "negative control for directed enrichment.")
     p.add_argument(
         "--mode", choices=["standard", "sample-efficiency"],
         default="sample-efficiency",
@@ -285,8 +293,14 @@ def _load_all_data(
     datasets_by_class: dict[str, list[Path]],
     spi_names: list[str],
     class_to_label: dict[str, int],
-) -> tuple[list[np.ndarray], list[np.ndarray], list[int], list[Path]]:
-    spi_tensors, mts_arrays, labels, paths = [], [], [], []
+) -> tuple[list[np.ndarray], list[np.ndarray], list[int], list[Path], list[str]]:
+    """Also returns the source class-dir name per instance.
+
+    Needed because --class-labels can map several class dirs to one label; the
+    sample-efficiency pool must still be drawn per DIRECTORY, or two merged
+    classes would sample the same instances twice.
+    """
+    spi_tensors, mts_arrays, labels, paths, src = [], [], [], [], []
     for class_name, dirs in datasets_by_class.items():
         label = class_to_label[class_name]
         for d in dirs:
@@ -297,9 +311,10 @@ def _load_all_data(
                 mts_arrays.append(mts)
                 labels.append(label)
                 paths.append(d)
+                src.append(class_name)
             except Exception as e:
                 print(f"[WARN] Skipping {d}: {e}")
-    return spi_tensors, mts_arrays, labels, paths
+    return spi_tensors, mts_arrays, labels, paths, src
 
 
 # ---------------------------------------------------------------------------
@@ -438,8 +453,13 @@ def _scale_tensors(
 
 def _run_standard(args: argparse.Namespace, data_dir: Path, output_dir: Path) -> None:
     class_names = args.class_names
-    class_to_label = {c: i for i, c in enumerate(class_names)}
-    n_classes = len(class_names)
+    if args.class_labels:
+        if len(args.class_labels) != len(class_names):
+            raise ValueError("--class-labels must have one entry per --class-names")
+        class_to_label = dict(zip(class_names, args.class_labels))
+    else:
+        class_to_label = {c: i for i, c in enumerate(class_names)}
+    n_classes = len(set(class_to_label.values()))
     models_to_run = args.models or list(ALL_MODELS)
 
     print(f"\n{'='*70}")
@@ -457,7 +477,7 @@ def _run_standard(args: argparse.Namespace, data_dir: Path, output_dir: Path) ->
     all_spi_names = load_spi_names(first_dir)
 
     print("[STAGE] Loading data...")
-    raw_spi, raw_mts, labels, _ = _load_all_data(
+    raw_spi, raw_mts, labels, _, src_class = _load_all_data(
         datasets_by_class, all_spi_names, class_to_label
     )
     n = len(raw_spi)
@@ -592,8 +612,13 @@ def _run_sample_efficiency(
     args: argparse.Namespace, data_dir: Path, output_dir: Path
 ) -> None:
     class_names = args.class_names
-    class_to_label = {c: i for i, c in enumerate(class_names)}
-    n_classes = len(class_names)
+    if args.class_labels:
+        if len(args.class_labels) != len(class_names):
+            raise ValueError("--class-labels must have one entry per --class-names")
+        class_to_label = dict(zip(class_names, args.class_labels))
+    else:
+        class_to_label = {c: i for i, c in enumerate(class_names)}
+    n_classes = len(set(class_to_label.values()))
     models_to_run = args.models or list(ALL_MODELS)
     n_train_values = sorted(args.n_train)
     n_val = args.val_per_class
@@ -619,7 +644,7 @@ def _run_sample_efficiency(
     all_spi_names = load_spi_names(first_dir)
 
     print("[STAGE] Loading all data...")
-    raw_spi, raw_mts, labels, _ = _load_all_data(
+    raw_spi, raw_mts, labels, _, src_class = _load_all_data(
         datasets_by_class, all_spi_names, class_to_label
     )
     n = len(raw_spi)
@@ -653,9 +678,9 @@ def _run_sample_efficiency(
     # This ensures n_train=50 subset ⊆ n_train=100 subset ⊆ ...
     rng = np.random.default_rng(_POOL_SEED)
     pool_by_class: dict[str, np.ndarray] = {}
+    src_arr = np.array(src_class)
     for class_name in class_names:
-        class_label = class_to_label[class_name]
-        class_pool = pool_idx[labels_arr[pool_idx] == class_label]
+        class_pool = pool_idx[src_arr[pool_idx] == class_name]
         pool_by_class[class_name] = rng.permutation(class_pool)
 
     max_pool = min(len(v) for v in pool_by_class.values())
