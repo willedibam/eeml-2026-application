@@ -18,7 +18,10 @@ echo "=============== JOB LOG: ${O:-none} ==============="
 echo
 echo "=============== FAILURE MARKERS ==============="
 if [ -n "${O:-}" ] && [ -f "$O" ]; then
-  grep -E "FATAL|### FAIL|### merge FAILED|too long|cannot be assembled" "$O" || echo "  none"
+  # Anchored: the job echoes a shard script that CONTAINS the literal
+  # '### FAIL' inside its `|| echo` clause, which matched as a false positive.
+  grep -E "^\[FATAL\]|^### FAIL|^### merge FAILED|too long|cannot be assembled" "$O" \
+    || echo "  none"
 fi
 echo
 echo "=============== SHARD LOGS WITH ERRORS ==============="
