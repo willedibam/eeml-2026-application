@@ -288,20 +288,52 @@ its rank is not identified. M06 is enriched (1.45x) at the smallest lambda
 tested, so the depletion is 9/10, not universal. And this is one dataset: it
 describes R0 until a second regime tests the prediction.
 
-### 2.4b Correction: fork/collider share a SKELETON (not chain/fork)
+### 2.4b The 2/3 ceiling: CHAIN and COLLIDER are the confusable pair (measured)
 
-Stated wrongly more than once, and it matters for what the 2/3 ceiling argument
-actually is. Conditional-independence Markov equivalence pairs **chain with
-fork** (same skeleton, no v-structure). But an SPI is either symmetric or not,
-so what an undirected statistic sees is the **skeleton**, and with this
-generator's motifs -- chain `0->1->2`, fork `0->1, 0->2`, collider
-`1->0, 2->0` -- it is **fork and collider** that share the skeleton `0-1, 0-2`,
-while chain's differs.
+Asserted two different wrong ways before being measured. The correct statement
+is empirical, and it explains the `correlation` baseline exactly.
 
-So the correct claim is: *an undirected statistic cannot separate fork from
-collider, capping any symmetric measure at 2/3 on the three-motif task.* That is
-the skeleton argument, not the Markov-equivalence one, and it is consistent with
-`correlation` measuring 0.59. Kuramoto was retired on this basis.
+Sorted |rho| triples over 400 instances per motif at M=3 (sorted, so
+label-invariant -- motif nodes are randomly permuted, so a symmetric statistic
+sees only the multiset):
+
+| motif | min | mid | max |
+|---|---|---|---|
+| chain | 0.015 | 0.032 | **0.056** |
+| collider | 0.015 | 0.032 | **0.058** |
+| fork | 0.020 | 0.048 | **0.206** |
+
+Separability from that triple alone (logistic regression, 5-fold CV):
+
+| pair | accuracy | chance |
+|---|---|---|
+| chain vs collider | **0.529** | 0.5 |
+| chain vs fork | 0.840 | 0.5 |
+| fork vs collider | 0.841 | 0.5 |
+| 3-way | **0.582** | 0.333 |
+
+**Mechanism.** The VAR has no self-persistence (`A` has zero diagonal), so
+`X_0[t]` is independent of `X_0[t-1]` and a directly-coupled pair has ~zero
+CONTEMPORANEOUS correlation. Only the fork produces instantaneous coupling,
+because its two children are driven by the same parent value. Chain and
+collider therefore look alike to any contemporaneous symmetric statistic, and
+separating them requires lag or direction.
+
+The measured 3-way 0.582 matches the `correlation` baseline's 0.59 to within
+noise -- the baseline is not underfitting, it is at its information ceiling.
+
+**Both earlier claims were wrong.** "Chain and fork are Markov-equivalent" is
+true for conditional independence but not what a contemporaneous statistic sees;
+"fork and collider share a skeleton" is true of the labelled skeletons but node
+labels are randomised, so the skeleton is not observable. The
+CLAUDE.md statement about Kuramoto is a different and correct claim: there the
+GENERATOR is symmetric, so fork and collider are literally the same process.
+
+This also explains `shuffled` reaching 0.82 at n=1000 (3.1): shuffling permutes
+values across pairs but preserves each SPI's multiset, and for DIRECTED lagged
+SPIs the multisets do differ between chain and collider ({a, a, a^2} vs
+{a, a, 0}), so the vocabulary retains chain/collider information that Pearson
+alone does not.
 
 ### 2.5c The probe recovers the correct AR ORDER (controlled, 10/10)
 
