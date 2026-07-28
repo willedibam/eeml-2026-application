@@ -1,0 +1,24 @@
+#!/bin/bash
+# TUH staging via copyq: the queue that has BOTH internet access and batch
+# durability. A ~2 h rsync on a login node is fragile -- NCI reaps long
+# login-node processes and the session dies with your SSH.
+#
+#   qsub -v MANIFEST=docs/tuh/manifest.csv docs/gadi/stage_copyq.pbs
+
+#PBS -N tuh_stage
+#PBS -P ql44
+#PBS -q copyq
+#PBS -l ncpus=1
+#PBS -l mem=8GB
+#PBS -l walltime=08:00:00
+#PBS -l storage=scratch/ql44
+#PBS -l wd
+#PBS -j oe
+
+set -uo pipefail
+MANIFEST="${MANIFEST:-docs/tuh/manifest.csv}"
+mkdir -p logs
+echo "[INFO] staging $(grep -vc '^#' "$MANIFEST") sessions, start $(date)"
+bash docs/gadi/stage_data.sh "$MANIFEST" 2>&1 | tail -200
+echo "[INFO] staged: $(find /scratch/ql44/tusz/edf -name '*.edf' | wc -l) EDFs"
+echo "[INFO] done $(date)"

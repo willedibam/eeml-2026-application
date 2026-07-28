@@ -1,0 +1,40 @@
+#!/bin/bash
+# Generic regime report as a BATCH job.
+#
+#   qsub -v DATA=<dir>,CLASSES=<c1,c2,c3>,TAG=<tag>[,LAM=0.01][,SEEDS=5] \
+#        docs/gadi/regime.pbs
+#
+# Exists because run_regime.sh was being run interactively on a login node,
+# where it dies with the SSH session (and NCI reaps long login-node processes
+# anyway). Anything over a few minutes belongs in the queue.
+
+#PBS -N regime
+#PBS -P ql44
+#PBS -q normal
+#PBS -l ncpus=6
+#PBS -l mem=48GB
+#PBS -l walltime=03:00:00
+#PBS -l storage=scratch/ql44+gdata/ql44
+#PBS -l wd
+#PBS -j oe
+
+set -uo pipefail
+DATA="${DATA:?set DATA}"
+CLASSES="${CLASSES:?set CLASSES}"
+TAG="${TAG:?set TAG}"
+LAM="${LAM:-0.01}"
+SEEDS="${SEEDS:-5}"
+
+module purge
+module load python3/3.12.1
+export UV_CACHE_DIR="${UV_CACHE_DIR:-/scratch/ql44/we2614/uv-cache}"
+source .venv/bin/activate
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1 KMP_DUPLICATE_LIB_OK=TRUE
+unset CUDA_VISIBLE_DEVICES || true
+mkdir -p logs results
+
+echo "[INFO] regime $TAG start $(date)"
+bash docs/run_regime.sh "$DATA" "$CLASSES" "$TAG" "$LAM" "$SEEDS" \
+  2>&1 | tee "logs/${TAG}_report.txt"
+echo "[INFO] done $(date). report: logs/${TAG}_report.txt"
