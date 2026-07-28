@@ -23,6 +23,23 @@ DIVERGING = "RdBu_r"        # signed, centred at 0
 SEQUENTIAL = LinearSegmentedColormap.from_list(
     "spi", ["#f2f5f7", "#a8c0cf", "#4a7fa5", "#1d3f5c", "#0b1c2a"])
 
+# Motif colours. Neutral for the two that a symmetric statistic CONFUSES
+# (chain, collider) and the accent for the one it separates (fork), so the
+# colour encodes the measured finding rather than decorating it.
+MOTIF = {"chain": "#16161a", "collider": "#7b7b88", "fork": "#c1440e"}
+
+# Model palette. The proposed model gets the accent; every baseline is a
+# neutral, so the eye finds the method without the figure arguing for it.
+MODELS = {
+    "spi-mpnn":        ACCENT,
+    "fixed-spi":       "#1d3f5c",
+    "correlation":     "#4a7fa5",
+    "latent":          "#8fb0c4",
+    "latent-directed": "#5d7c8a",
+    "node-only":       "#b9b9c2",
+    "shuffled":        "#8a7a5c",
+}
+
 # Layer tints for the K-stack: the SAME three colours identify the same three
 # SPIs in every panel, which is what makes the matrix stack and the graph stack
 # read as the same object.
