@@ -26,7 +26,8 @@ from figures import style
 from figures.fig1_data import series, spi_matrices
 
 KEYS = ["cov", "lag1", "coh"]
-TITLES = [r"$|\rho_{ij}|$", r"$|\rho_{ij}(\tau{=}1)|$", r"$\mathrm{coh}_{ij}$"]
+TITLES = [r"$|\rho_{ij}|$", r"$\rho_{ij}(\tau{=}1)$  (directed)",
+          r"$\mathrm{coh}_{ij}$"]
 SKEW, DX, DY = -24, 2.75, 2.05
 ALPHA = [1.0, 0.86, 0.72]          # depth cue, mild enough that hue survives
 
@@ -79,10 +80,24 @@ def panel_c(ax, S, M):
                 w = (A[i, j] - lo) / (hi - lo + 1e-9)
                 # Steep exponent: at a gentler one all 10 chords stay visible and
                 # three superimposed decks read as noise.
-                ax.plot(P[[i, j], 0], P[[i, j], 1], transform=tr,
-                        color=style.LAYERS[d], lw=0.25 + 2.9 * w ** 2.4,
-                        alpha=ALPHA[d] * (0.10 + 0.90 * w ** 1.8),
-                        zorder=10 - d, solid_capstyle="round")
+                lw = 0.25 + 2.9 * w ** 2.4
+                al = ALPHA[d] * (0.10 + 0.90 * w ** 1.8)
+                if k == "lag1":
+                    # This layer is genuinely ASYMMETRIC, so draw it that way.
+                    # Directedness is not decoration: fork and collider are
+                    # Markov-equivalent under any symmetric statistic, so an
+                    # all-undirected figure would illustrate a vocabulary that
+                    # provably cannot do the task.
+                    a, b = (i, j) if A[i, j] >= A[j, i] else (j, i)
+                    ax.add_patch(FancyArrowPatch(
+                        P[a], P[b], transform=tr, arrowstyle="-|>",
+                        mutation_scale=2.6 + 3.4 * w, lw=0.85 * lw,
+                        color=style.LAYERS[d],
+                        alpha=al, zorder=10 - d, shrinkA=3.2, shrinkB=3.2))
+                else:
+                    ax.plot(P[[i, j], 0], P[[i, j], 1], transform=tr,
+                            color=style.LAYERS[d], lw=lw, alpha=al,
+                            zorder=10 - d, solid_capstyle="round")
         for i in range(M):
             ax.add_patch(plt.Circle(P[i], 0.16, facecolor=style.PAPER,
                                     edgecolor=style.INK, lw=0.55,
@@ -120,7 +135,7 @@ def build():
         ax_b.add_patch(plt.Rectangle((-3.7, ly - 0.20), 0.5, 0.40,
                                      facecolor=style.LAYERS[d],
                                      edgecolor="none", zorder=20))
-        ax_b.text(-3.0, ly, t, fontsize=6.8, va="center", zorder=20)
+        ax_b.text(-3.0, ly, t, fontsize=6.6, va="center", zorder=20)
     # Depth marker on (b) only: repeating it on (c) says "another K", not "the
     # same K seen differently", which is the opposite of the panel's point.
     ax_b.text(9.6, 7.9, "...", fontsize=12, color=style.GREY,

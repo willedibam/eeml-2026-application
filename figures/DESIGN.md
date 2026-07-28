@@ -68,13 +68,21 @@ method figure. Panel (c) is already one complete idea.
 
 ## Open design questions — need a decision
 
-1. **Directedness is not shown.** Two of the three statistics drawn are
-   symmetric, so panel (c) has undirected chords. But directedness is central
-   (fork and collider are Markov-equivalent under any symmetric statistic).
-   Options: (i) make one layer explicitly directed with arrowheads, (ii) leave
-   Fig 1 undirected and let the case-study figure carry directedness. Leaning
-   (i) — it costs one layer and pre-empts the objection.
+1. ~~Directedness is not shown.~~ **Resolved.** The lag-1 layer is genuinely
+   asymmetric and is now drawn with arrowheads, dominant direction per pair.
+   Not decoration: fork and collider are Markov-equivalent under any symmetric
+   statistic, so an all-undirected Fig 1 would illustrate a vocabulary that
+   provably cannot do the task.
 2. **Poster LaTeX class** fixes fonts and therefore whether schematics move to
    TikZ. Needed before Fig 2.
-3. Whether Fig 0 (motivation) is empirical (`latent-directed` vs `spi-mpnn`:
-   equal accuracy, unequal insight) or conceptual. Recommend empirical.
+3. **Fig 0: now recommend CONCEPTUAL, reversing an earlier call.** The
+   empirical version was to be "equal accuracy, unequal insight". The data says
+   accuracy is not equal: `latent-directed` sits at chance (0.27-0.34) at every
+   n up to 700 across three seeds, while `spi-mpnn` reaches 0.86 at n=20. So the
+   comparison is a *result*, not a motivation, and showing it early spoils the
+   build. Fig 0 should be the minimal three-routes panel (assumed / latent /
+   named vocabulary); the curves pay it off later.
+
+   Caveat that must ship with that result: one architecture, capacity-validated
+   but not extensively tuned. "You did not tune the latent baseline" is the fair
+   objection and the limit should be stated rather than waited for.
