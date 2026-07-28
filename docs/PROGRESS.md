@@ -288,6 +288,21 @@ its rank is not identified. M06 is enriched (1.45x) at the smallest lambda
 tested, so the depletion is 9/10, not universal. And this is one dataset: it
 describes R0 until a second regime tests the prediction.
 
+### 2.4b Correction: fork/collider share a SKELETON (not chain/fork)
+
+Stated wrongly more than once, and it matters for what the 2/3 ceiling argument
+actually is. Conditional-independence Markov equivalence pairs **chain with
+fork** (same skeleton, no v-structure). But an SPI is either symmetric or not,
+so what an undirected statistic sees is the **skeleton**, and with this
+generator's motifs -- chain `0->1->2`, fork `0->1, 0->2`, collider
+`1->0, 2->0` -- it is **fork and collider** that share the skeleton `0-1, 0-2`,
+while chain's differs.
+
+So the correct claim is: *an undirected statistic cannot separate fork from
+collider, capping any symmetric measure at 2/3 on the three-motif task.* That is
+the skeleton argument, not the Markov-equivalence one, and it is consistent with
+`correlation` measuring 0.59. Kuramoto was retired on this basis.
+
 ### 2.5c The probe recovers the correct AR ORDER (controlled, 10/10)
 
 The sharpest anti-tautology evidence in the project, and it needs no new data.
