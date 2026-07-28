@@ -1,8 +1,12 @@
 #!/bin/bash
 # Generic regime report as a BATCH job.
 #
-#   qsub -v DATA=<dir>,CLASSES=<c1,c2,c3>,TAG=<tag>[,LAM=0.01][,SEEDS=5] \
+#   qsub -v DATA=<dir>,CLASSES=<c1+c2+c3>,TAG=<tag>[,LAM=0.01][,SEEDS=5] \
 #        docs/gadi/regime.pbs
+#
+# NOTE the '+' separator for CLASSES. `qsub -v` splits its argument on COMMAS to
+# separate variables, so a comma-separated class list is parsed as three broken
+# variables and qsub fails with "cannot send environment with the job".
 #
 # Exists because run_regime.sh was being run interactively on a login node,
 # where it dies with the SSH session (and NCI reaps long login-node processes
@@ -21,6 +25,7 @@
 set -uo pipefail
 DATA="${DATA:?set DATA}"
 CLASSES="${CLASSES:?set CLASSES}"
+CLASSES="${CLASSES//+/,}"   # accept + as the qsub-safe separator
 TAG="${TAG:?set TAG}"
 LAM="${LAM:-0.01}"
 SEEDS="${SEEDS:-5}"
