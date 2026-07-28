@@ -37,11 +37,22 @@ def main() -> None:
     root = Path(sys.argv[1])
     limit = int(sys.argv[2]) if len(sys.argv) > 2 else 5
 
-    edfs = sorted(root.rglob("*.edf"))
-    if not edfs:
+    all_edfs = sorted(root.rglob("*.edf"))
+    if not all_edfs:
         print(f"No .edf under {root} -- has staging run?")
         sys.exit(1)
-    print(f"found {len(edfs)} staged EDFs; testing {min(limit, len(edfs))}\n")
+    # One session per PATIENT. Montage consistency within a patient says
+    # nothing: TUSZ recordings differ in electrode sets ACROSS patients, and a
+    # varying channel count is the failure that breaks the pipeline rather than
+    # degrading it. Sequential sampling would happily test ten sessions from
+    # one subject and prove nothing.
+    by_patient: dict[str, Path] = {}
+    for e in all_edfs:
+        pid = e.name.split("_")[0]
+        by_patient.setdefault(pid, e)
+    edfs = list(by_patient.values())[:limit]
+    print(f"found {len(all_edfs)} staged EDFs across {len(by_patient)} patients; "
+          f"testing {len(edfs)} (one per patient)\n")
 
     fs_seen, m_seen, errs = Counter(), Counter(), Counter()
     n_ok = n_win = 0
