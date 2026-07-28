@@ -79,15 +79,22 @@ done
 # if they belonged to this one.
 rm -f results/*tuh_*_s[0-9]*_results.json results/tuh_*_merged_results.json
 
-CMDS=$(mktemp)
+# One tiny script per shard, then xargs over the PATHS. Passing the commands
+# themselves to `xargs -I` fails: a ~350-character replacement exceeds the
+# limit and xargs aborts with "command line cannot be assembled, too long",
+# which would kill every shard rather than one. Short paths avoid it entirely
+# and sidestep all quoting questions.
+SDIR=$(mktemp -d)
 emit () {   # key, models, lambda
   for ((s = 0; s < SEEDS; s++)); do
-    printf '%s\n' "python -u -m src.run_pipeline --data-dir '$DATA' \
---class-names fnsz gnsz --group-by-patient --mode sample-efficiency \
---n-train $NTRAIN --test-per-class 150 --val-per-class 100 \
---seeds 1 --seed-offset $s --models $2 --group-lambda $3 \
---spi-groups literature --device cpu --tag tuh_${1}_s${s} \
-> logs/tuh_${1}_s${s}.log 2>&1 || echo '### FAIL ${1}_s${s}'" >> "$CMDS"
+    cat > "$SDIR/${1}_s${s}.sh" <<EOF
+python -u -m src.run_pipeline --data-dir "$DATA" \
+  --class-names fnsz gnsz --group-by-patient --mode sample-efficiency \
+  --n-train $NTRAIN --test-per-class 150 --val-per-class 100 \
+  --seeds 1 --seed-offset $s --models $2 --group-lambda $3 \
+  --spi-groups literature --device cpu --tag tuh_${1}_s${s} \
+  > logs/tuh_${1}_s${s}.log 2>&1 || echo "### FAIL ${1}_s${s}"
+EOF
   done
 }
 emit node_only       "node-only"       0.01
@@ -98,9 +105,11 @@ emit fixed_spi       "fixed-spi"       0.01
 emit gl002           "spi-mpnn"        0.002
 emit gl005           "spi-mpnn"        0.005
 
-echo "[INFO] $(wc -l < "$CMDS") shards, pool of $JOBS"
-xargs -P "$JOBS" -I CMD bash -c CMD < "$CMDS"
-rm -f "$CMDS"
+N_SHARDS=$(ls "$SDIR" | wc -l)
+echo "[INFO] $N_SHARDS shards, pool of $JOBS"
+head -3 "$SDIR/spi_mpnn_s0.sh"
+ls "$SDIR"/*.sh | xargs -P "$JOBS" -n 1 bash
+rm -rf "$SDIR"
 
 for k in node_only shuffled spi_mpnn latent_directed fixed_spi gl002 gl005; do
   python -m src.analysis --merge "tuh_${k}" results >/dev/null 2>&1 \
