@@ -288,6 +288,44 @@ its rank is not identified. M06 is enriched (1.45x) at the smallest lambda
 tested, so the depletion is 9/10, not universal. And this is one dataset: it
 describes R0 until a second regime tests the prediction.
 
+### 2.5c The probe recovers the correct AR ORDER (controlled, 10/10)
+
+The sharpest anti-tautology evidence in the project, and it needs no new data.
+
+pyspi's vocabulary contains `sgc_parametric` at several model orders with
+everything else matched -- same estimator, same statistic (mean/max), same
+frequency bands, **6 SPIs per arm**. The only varying factor is the order of the
+AR model the estimator fits. Measured across the same 10 lambda runs, as mean
+|w| relative to the vocabulary average (1.0 = a typical SPI):
+
+| arm | median |w| | vs order-20 |
+|---|---|---|
+| `sgc_parametric` **order-1** (correct for a VAR(1)) | **5.22x** | -- |
+| `sgc_parametric` order-None (auto) | 4.45x | -- |
+| `sgc_parametric` **order-20** (20x overparameterised) | **0.65x** | order-1 wins **10/10**, median **8.63x** |
+| `sgc_nonparametric` | 0.64x | order-1 wins **10/10**, median **9.06x** |
+
+Note this also corrects 2.5b: the M05/M06 contrast is NOT parametric vs
+nonparametric. M06 contains `sgc_parametric_*_order-20`, i.e. the same estimator
+at the wrong order. The within-estimator table above is the clean version and
+the module-level one is confounded by M06's 36 non-sGC members.
+
+**Why this is discovery, not confirmation.** "Granger wins on a VAR" is entailed
+by the generator. Nothing in the generator encodes a preference over *model
+order*: order-1 is correctly specified for a VAR(1), order-20 pays a variance
+cost for 20x the parameters. The probe recovered a **statistical efficiency**
+property of the estimator, not the physics property built into the data. And it
+is matched on estimator, statistic and band, so it cannot be a module-size,
+directedness or linearity artifact -- the three confounds that weakened every
+earlier claim.
+
+**The experiment this demands.** On VAR(p) data with p > 1 the preferred order
+should track p. A dose-response curve (true order 1, 2, 3, 5, 10 vs recovered
+order preference) would turn a single observation into a calibration curve, and
+a flat preference for order-1 regardless of true p would falsify it. Same
+generator, one changed parameter, same cost as R0. This is the highest-value
+synthetic experiment remaining.
+
 ### 2.6 The vocabulary: ~125/136 SPIs retired, ~297 is the standard
 
 The EEML abstract used `configs/pyspi/eeml.yaml` (~136 SPIs, ~125 after
