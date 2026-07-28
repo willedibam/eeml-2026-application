@@ -52,6 +52,25 @@ unset CUDA_VISIBLE_DEVICES || true
 mkdir -p logs results
 
 echo "[INFO] TUH battery start $(date)  data=$DATA  seeds=$SEEDS  jobs=$JOBS"
+
+# REFUSE to run while generation is still going. An instance count alone is not
+# enough: it passes on a partial corpus, and a worker may be mid-write on the
+# very .npz this job is about to read. Each finished shard prints one
+# "sessions ok=N err=M" line to its .o file, so the sessions accounted for must
+# equal the manifest before training is allowed to start.
+MANIFEST="${MANIFEST:-docs/tuh/manifest.csv}"
+WANT=$(grep -vc '^#' "$MANIFEST" 2>/dev/null || echo 0)
+GOT=$(grep -h "sessions ok=" tuh_gen.o* 2>/dev/null \
+      | sed -E 's/.*ok=([0-9]+) err=([0-9]+).*/\1 \2/' \
+      | awk '{t += $1 + $2} END {print t+0}')
+echo "[INFO] generation accounted for $GOT of $WANT manifest sessions"
+if [ "$WANT" -gt 0 ] && [ "$GOT" -lt "$WANT" ]; then
+  echo "[FATAL] generation incomplete ($GOT/$WANT sessions)."
+  echo "        Shards still running would be written to WHILE this job reads"
+  echo "        them. Wait for 'tuh_gen shards: 0 still running', then resubmit."
+  exit 6
+fi
+
 for c in fnsz gnsz; do
   n=$(find "$DATA/$c" -name spi_mpis.npz 2>/dev/null | wc -l)
   echo "  $c: $n instances"
