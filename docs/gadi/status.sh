@@ -22,8 +22,11 @@ for c in fnsz gnsz; do
   tot=$((tot + n)); printf "  %-6s %5d windows\n" "$c" "$n"
 done
 echo "  total  $tot"
-running=$(qstat -tu "$USER" 2>/dev/null | grep -c "tuh_gen")
-echo "  tuh_gen subjobs still listed: $running   (0 = generation finished)"
+# 'X' means a subjob has EXITED. Counting it as still-running made the progress
+# line read 14 when three shards were already done.
+act=$(qstat -tu "$USER" 2>/dev/null | grep "tuh_gen" | awk '$10!="X"' | wc -l | tr -d ' ')
+fin=$(qstat -tu "$USER" 2>/dev/null | grep "tuh_gen" | awk '$10=="X"' | wc -l | tr -d ' ')
+echo "  tuh_gen shards: $act still running, $fin finished   (0 running = done)"
 
 echo
 echo "=============== REPORTS PRESENT ==============="
@@ -35,10 +38,16 @@ done
 
 echo
 echo "=============== TUH CONTROLS (read these first) ==============="
-if [ -f logs/tuh_report.txt ]; then
+# Guard against the stale report: an early chained run produced a complete-
+# looking tuh_report.txt from ZERO windows. If the file has no per-n rows, say
+# so rather than printing a legend that implies results exist.
+if [ -f logs/tuh_report.txt ] && grep -qE "^  [0-9]+ +0\.[0-9]" logs/tuh_report.txt; then
   # node-only near chance keeps the coupling claim alive; high means the classes
   # differ in per-channel activity and the SPI vocabulary is mismatched.
   grep -E "^-{8}|node-only|shuffled|spi-mpnn|^  [0-9]+ " logs/tuh_report.txt | head -30
+elif [ -f logs/tuh_report.txt ]; then
+  echo "  logs/tuh_report.txt exists but has NO result rows -- this is the stale"
+  echo "  report from the early zero-window run. Ignore until tuh_train reruns."
 else
   echo "  not yet -- tuh_train runs automatically when every shard exits 0"
 fi
