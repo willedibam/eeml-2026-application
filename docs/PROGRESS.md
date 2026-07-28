@@ -382,6 +382,12 @@ PYTHONPATH=. python docs/compare_resolutions.py <results.json>
 # does the probe rank statistics by standalone utility?
 PYTHONPATH=. python docs/probe_vs_utility.py <data-dir> <c1,c2,c3> <results.json>
 
+# validity audit over every result JSON (seconds, no compute)
+PYTHONPATH=. python docs/validity_report.py results/*.json
+
+# paired cross-regime signature shift (only if BOTH runs clear chance)
+PYTHONPATH=. python docs/compare_regimes.py results/<ref>.json results/<test>.json
+
 # regression guard (~30 s) — run before any commit touching train/model/CLI
 python tests/test_regression.py
 ```
@@ -389,3 +395,64 @@ python tests/test_regression.py
 Result JSONs carry `hyperparameters`, `spi_names`, `spi_families`,
 `spi_asymmetry` and per-seed `learned_w`, so every analysis above reproduces
 from the JSON alone.
+
+---
+
+## 7. The validity protocol (candidate contribution)
+
+Most interpretability methods report a signature and offer no test that the
+signature means anything. This project has accumulated one, largely by being
+burned. Stated as a protocol rather than a list of incidents, it is a
+contribution in its own right — and unusually, it has **rejected three of its
+own results**, which is the evidence that it is not decorative.
+
+### 7.1 The gates
+
+| gate | what it asks | void if |
+|---|---|---|
+| `node-only` | can node features alone (mean, std, lag-1 autocorr, dominant FFT mag) do it? | clears chance → classes differ in what channels DO, not how they couple; vocabulary mismatched |
+| `shuffled` | are SPI values permuted across pairs enough? | clears chance → signal is the marginal distribution of SPI values, not pair correspondence |
+| at-chance | is the primary model itself above chance? | not separated from chance → the signature is group-lasso geometry, not mechanism |
+| Markov equivalence | is the discriminating statistic symmetric? | chain/fork indistinguishable under undirected statistics (Verma & Pearl 1990) → hard 2/3 ceiling |
+| permutation null | is module enrichment larger than under permuted `w`? | not exceeded → enrichment is a size artifact |
+| stability selection | is the same SPI chosen across seeds? | low → within-family specificity unidentified (collinearity; Zhao & Yu 2006) |
+
+The first three are empirical and now audited automatically by
+`docs/validity_report.py`. The fourth is a **proof**, not a measurement.
+
+### 7.2 Cases where it rejected our own results
+
+1. **R1 (`var_nonlinear_a`) withdrawn.** F1 0.9987, better than R0 — backwards
+   for a supposedly harder regime. `node-only` scored **0.913** (chance 0.5):
+   the nonlinearity sat in the state update, so each node's AR structure varied
+   with its in-degree, and the motif leaked through the marginals. The task was
+   solvable with no pairwise information at all.
+2. **Kuramoto abandoned before spending compute.** Fork and collider are
+   Markov-equivalent under symmetric coupling, capping any undirected method at
+   2/3. Structural, so no experiment was needed.
+3. **R1b's first report void.** Module M05 at 4.66×, z=11.7, P(top)=1.00 — from
+   a classifier at F1 0.4149 ± 0.0728 against 0.333 chance. The enrichment
+   machinery works fine on a model that learned nothing.
+
+Also caught by the same instinct: the abstract's "causal family carries ~3.5×
+the L2 norm" was **size-confounded** (48 of ~125 SPIs) and is replaced by
+enrichment against a permutation null, which has a null distribution and is not
+size-dependent.
+
+### 7.3 Why the at-chance test is statistical, not a margin
+
+R1b at n=700 scored 0.4149 against 0.333. A fixed margin of 0.05 calls that
+"above chance". The per-seed SD is 0.0728, so it is well inside two SDs of
+chance. `validity_report.py` requires **both** `mean - 2*sd > chance` and
+`mean > chance + margin`; on the real R1b numbers a margin-only rule returned
+INTERPRETABLE and the statistical rule returns VOID.
+
+### 7.4 What is missing before this is publishable as a contribution
+
+- The gates are **necessary, not sufficient**. Passing all of them does not
+  establish that `w` recovers mechanism; R0 passes and is still tautological.
+- No **false-negative** characterisation: no case where the protocol wrongly
+  voided a good result. Without that, its specificity is unmeasured.
+- `UNGATED` was the normal state until now — `run_regime.sh` hardcoded
+  `--models spi-mpnn`, so regime reports had no gates at all. The protocol
+  existed in `baselines.pbs` and in judgement, not in the default path.
