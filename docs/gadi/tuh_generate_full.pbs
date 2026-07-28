@@ -33,7 +33,17 @@ SHARD="${PBS_ARRAY_INDEX:-1}"
 module purge
 module load python3/3.12.1
 export UV_CACHE_DIR="${UV_CACHE_DIR:-/scratch/ql44/we2614/uv-cache}"
-source .venv/bin/activate
+# Use the GENERATOR venv, not the eeml one: it is the only environment with a
+# working pyspi. pyspi pins tslearn 0.6.3 -> numba 0.53.1, which refuses to
+# build on Python >= 3.10, so `uv pip install -e ~/pyspi-fork` fails in a fresh
+# 3.12 venv. The generator venv predates that pin resolution and works.
+# It additionally needs mne for EDF reading:
+#     source ~/mts-spi-study-cluster/.venv/bin/activate && uv pip install mne
+VENV="${VENV:-$HOME/mts-spi-study-cluster/.venv}"
+source "$VENV/bin/activate"
+python -c "import pyspi, mne" || {
+  echo "[FATAL] $VENV lacks pyspi or mne. Install mne there:"
+  echo "  source $VENV/bin/activate && uv pip install mne"; exit 3; }
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
 export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1 KMP_DUPLICATE_LIB_OK=TRUE
 unset CUDA_VISIBLE_DEVICES || true

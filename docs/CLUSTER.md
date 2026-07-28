@@ -37,19 +37,29 @@ A conda env named `mts-spi` may be active in your shell and will shadow the
 venv. If `which python` is not under `.venv/bin`, run `source .venv/bin/activate`
 again.
 
-**TUH generation needs BOTH environments' contents.** It reads EDFs (`mne`,
-eeml venv) and computes SPIs (`pyspi`, generator venv), so the eeml venv needs
-pyspi installed too:
+**TUH generation needs `mne` AND `pyspi`, and only the generator venv can have
+both.** It reads EDFs with mne and computes SPIs with pyspi.
+
+**pyspi cannot be installed into a fresh Python 3.12 venv.** It pins
+`tslearn==0.6.3`, which pins `numba==0.53.1`, which refuses to build:
+`RuntimeError: Cannot install on Python version 3.12.1; only versions
+>=3.6,<3.10 are supported`. The generator venv predates that resolution and has
+a working pyspi, so use it rather than trying to rebuild:
 
 ```bash
-cd /scratch/ql44/we2614/eeml-2026-application && source .venv/bin/activate
-uv pip install -e ~/pyspi-fork      # editable: keeps the fork's te_kraskov DCE edits
-uv pip install mne
+source ~/mts-spi-study-cluster/.venv/bin/activate
+uv pip install mne          # the only thing it is missing
 ```
 
-Skipping this fails as `ModuleNotFoundError: No module named 'pyspi'` inside the
-worker processes, which surfaces as every session erroring and zero windows
-written — not as an obvious import failure at job start.
+`tuh_generate_full.pbs` therefore sources the GENERATOR venv (overridable with
+`VENV=`) and preflights `import pyspi, mne`, exiting 3 with instructions if
+either is absent. Without that preflight the failure appears as every session
+erroring inside worker processes with zero windows written — not as an import
+error at job start.
+
+Do **not** attempt `uv pip install -e ~/pyspi-fork` into the eeml venv; it will
+fail on numba. If pyspi is ever needed there, it would require relaxing the
+tslearn/numba pins in the fork.
 
 ## Queues
 
