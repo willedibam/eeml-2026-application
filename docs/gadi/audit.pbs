@@ -1,0 +1,68 @@
+#!/bin/bash
+# Validity audit + cross-regime comparison over whatever result JSONs exist.
+#
+#   qsub docs/gadi/audit.pbs
+#
+# Batch rather than interactive: it takes seconds, but a login-node run dies
+# with the SSH session and the output is then lost, which has cost time already.
+# Writes logs/audit_report.txt so the result survives a disconnect and can be
+# pasted back on its own.
+#
+# Pure JSON analysis -- no training, no pyspi. Safe to run at any time, and
+# re-runnable as more results land.
+
+#PBS -N eeml_audit
+#PBS -P ql44
+#PBS -q normal
+#PBS -l ncpus=1
+#PBS -l mem=8GB
+#PBS -l walltime=00:20:00
+#PBS -l storage=scratch/ql44+gdata/ql44
+#PBS -l wd
+#PBS -j oe
+
+set -uo pipefail
+
+REF="${REF:-}"          # reference regime JSON for compare_regimes (optional)
+module purge
+module load python3/3.12.1
+export UV_CACHE_DIR="${UV_CACHE_DIR:-/scratch/ql44/we2614/uv-cache}"
+source .venv/bin/activate
+mkdir -p logs
+
+REPORT="logs/audit_report.txt"
+{
+echo "==================== VALIDITY AUDIT  $(date) ===================="
+shopt -s nullglob
+JSONS=(results/*_results.json)
+if [ ${#JSONS[@]} -eq 0 ]; then
+  echo "no result JSONs in results/ -- nothing to audit"
+else
+  PYTHONPATH=. python docs/validity_report.py "${JSONS[@]}"
+fi
+
+# Cross-regime comparison, if a reference and at least one other run exist.
+# compare_regimes refuses to interpret a near-chance run on its own, so this is
+# safe to fire blindly: a void pair reports as void rather than producing a
+# number that looks meaningful.
+if [ -z "$REF" ]; then
+  REF=$(ls -1 results/*r0*_results.json 2>/dev/null | head -1)
+fi
+if [ -n "$REF" ] && [ -f "$REF" ]; then
+  echo
+  echo "==================== CROSS-REGIME (ref=$(basename "$REF")) ===================="
+  for f in results/*_results.json; do
+    [ "$f" = "$REF" ] && continue
+    case "$(basename "$f")" in *r0*) continue;; esac
+    echo
+    PYTHONPATH=. python docs/compare_regimes.py "$REF" "$f" 2>&1 | head -40
+  done
+else
+  echo
+  echo "[INFO] no R0 reference JSON found; skipping cross-regime comparison"
+fi
+echo
+echo "==================== END ===================="
+} 2>&1 | tee "$REPORT"
+
+echo "[INFO] done $(date). report: $REPORT"
