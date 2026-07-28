@@ -249,6 +249,45 @@ by sharding the two long runs across seeds via `--seed-offset`.
 
 ---
 
+### 2.5b Parametric beats nonparametric WITHIN the directed-spectral class
+
+The strongest synthetic result, and the one that is not the tautology.
+
+Measured across **10 independent lambda runs** on R0-297 (two separate sweeps,
+lambda 0.001-0.05, a 50x range):
+
+| module | what it contains | K | enrichment (median) | range |
+|---|---|---|---|---|
+| M01 | CoherencePhase, PhaseSlopeIndex, GroupDelay, PhaseLagIndex (band) | 6 | **6.98x** | 3.12-14.16, enriched in 10/10 |
+| M05 | **parametric** spectral GC, TE-gaussian, TE-symbolic, phi*, SI-gaussian | 20 | **4.41x** | 3.20-6.63, enriched in 10/10 |
+| M06 | **nonparametric** directed spectral: DTF, DC, PDC, GPDC, dDTF, sGC-nonparametric | 42 | **0.54x** | 0.27-1.45, depleted in 9/10 |
+
+M05 and M06 are **both directed and both spectral**. A directed-vs-undirected
+analysis lumps them together; the probe separates them, and does so consistently
+across a 50x lambda range and two independent sweeps. 42 directed-spectral SPIs
+are actively *depleted* -- they carry less weight than their share of the
+vocabulary.
+
+**Why this is a claim and not a restatement of the generator.** "Granger wins on
+a VAR" is entailed. "Among estimators that all target directed spectral
+influence, the *correctly specified parametric* ones dominate and the
+factorization-based nonparametric ones are depleted" is a statement about
+**estimator efficiency under correct specification** -- R0 is a VAR(1), so the
+parametric AR model is correctly specified, and parametric spectral GC estimates
+its coefficients directly where DTF/PDC/nonparametric-sGC go through spectral
+density factorization. That is a statistical fact the probe recovered, not a
+physics fact built into the generator.
+
+**It is falsifiable.** On a generator that is not an AR process, or where AR
+order is misspecified, M06 should stop being depleted relative to M05, or the
+ordering should flip. That prediction is the reason a second valid regime
+matters.
+
+**Caveats, stated.** M01's enrichment varies 3.12-14.16 (K=6, high variance) --
+its rank is not identified. M06 is enriched (1.45x) at the smallest lambda
+tested, so the depletion is 9/10, not universal. And this is one dataset: it
+describes R0 until a second regime tests the prediction.
+
 ### 2.6 The vocabulary: ~125/136 SPIs retired, ~297 is the standard
 
 The EEML abstract used `configs/pyspi/eeml.yaml` (~136 SPIs, ~125 after
@@ -419,6 +458,23 @@ own results**, which is the evidence that it is not decorative.
 
 The first three are empirical and now audited automatically by
 `docs/validity_report.py`. The fourth is a **proof**, not a measurement.
+
+### 7.1b Signature stability under lambda, measured
+
+The sharpest attack on a learned-weight claim is "you tuned lambda until the
+answer looked right". Measured over 10 runs spanning 50x
+(`docs/lambda_path_signature.py`):
+
+- **M05 is top-1 in 9/10 runs.** The exception is a near-tie (M01 30% vs M05
+  27%).
+- Module-share rank correlation across the path: mean rho +0.86, min +0.74.
+- **Ranks below 1 are NOT identified**: the top-2 set is {M01, M05} in only 6/10,
+  and the top-3 set takes 6 distinct values across 10 runs.
+
+So the reportable unit is the enrichment of a module against a permutation null,
+not a ranking of modules against each other. The M05-enriched / M06-depleted
+contrast (2.5b) holds in 10/10 and 9/10 respectively; "M05 is the top module"
+holds in 9/10 and should be stated with that number attached.
 
 ### 7.2 Cases where it rejected our own results
 

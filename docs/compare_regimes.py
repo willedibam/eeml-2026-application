@@ -46,11 +46,14 @@ def _load(path: Path, n_key: str | None = None):
     n_key = n_key or max(se, key=int)
     blk = se[n_key]["models"].get("spi-mpnn")
     if blk is None:
-        raise SystemExit(f"{path.name}: no spi-mpnn block at n_train={n_key}")
+        # Ablation-only runs (sgc_only, top3, edge_ablation) legitimately have no
+        # spi-mpnn. Skip them instead of exiting, or one such file aborts a whole
+        # batch audit.
+        return None
     W = np.abs(np.array([p["learned_w"] for p in blk["per_seed"]], dtype=float))
     return {"name": path.name, "names": names, "W": W, "n": n_key,
             "f1": blk["f1_mean"], "f1_std": blk.get("f1_std", float("nan")),
-            "lam": r["hyperparameters"].get("group_lambda")}
+            "lam": (r.get("hyperparameters") or {}).get("group_lambda")}
 
 
 def _module_shares(names: list[str], W: np.ndarray, mods: np.ndarray) -> dict:
@@ -61,6 +64,10 @@ def _module_shares(names: list[str], W: np.ndarray, mods: np.ndarray) -> dict:
 
 def compare(ref: Path, test: Path, chance: float, n_boot: int = 4000) -> None:
     A, B = _load(ref), _load(test)
+    if A is None or B is None:
+        missing = ", ".join(p.name for p, d in ((ref, A), (test, B)) if d is None)
+        print(f"=== skipped: no spi-mpnn block in {missing} ===")
+        return
 
     # Restrict to the SPIs both runs retained; the robust-scaling filter can
     # drop different columns in different datasets, and comparing shares over
