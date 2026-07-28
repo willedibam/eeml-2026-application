@@ -54,5 +54,7 @@ fi
 
 echo
 echo "=============== FAILURES IN RECENT LOGS ==============="
-grep -lE "FATAL|Traceback|### FAIL" ./*.o[0-9]* logs/*.log 2>/dev/null | head -8 \
+# Anchored: the training job echoes a generated shard script whose text
+# contains the literal "### FAIL" inside its own || echo clause.
+grep -lE "^\[FATAL\]|Traceback|^### FAIL" ./*.o[0-9]* logs/*.log 2>/dev/null | head -8 \
   || echo "  none found"
