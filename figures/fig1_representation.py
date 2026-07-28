@@ -121,7 +121,7 @@ def build():
 
     im = panel_a(ax_a, x)
     cb = fig.colorbar(im, ax=ax_a, fraction=0.035, pad=0.03, ticks=[-2.4, 0, 2.4])
-    cb.ax.set_yticklabels(["−2", "0", "+2"], fontsize=6.5)
+    cb.ax.set_yticklabels([r"$-2$", "0", r"$+2$"], fontsize=6.5)
     cb.outline.set_visible(False); cb.ax.tick_params(length=0, pad=1.5)
 
     panel_b(ax_b, S, M)

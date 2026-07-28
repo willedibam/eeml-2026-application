@@ -91,9 +91,11 @@ def panel_a(ax, W, names, n_perm=4000):
     ax.set_xticks([0.2, 1, 5, 20]); ax.set_xticklabels(["0.2", "1", "5", "20"], fontsize=7)
     ax.set_ylim(-0.8, len(rows) - 0.2)
     ax.set_xlabel("enrichment of $|w|$  (1 = no preference)", fontsize=7.5)
-    ax.text(0.97, 0.045, "band = permutation null",
+    # Below the axis: every in-panel position collides with either the top
+    # (M01's lollipop) or the bottom (M03/M07 reaching the left edge).
+    ax.text(0.5, -0.30, "shaded band = permutation null",
             transform=ax.transAxes, fontsize=6.2, color=style.GREY,
-            ha="right", va="bottom")
+            ha="center", va="top")
 
 
 def panel_b(ax, runs):
@@ -112,8 +114,8 @@ def panel_b(ax, runs):
                 alpha=0.55, zorder=3)
         ax.plot([i - 0.28, i + 0.28], [np.median(v)] * 2, color=c, lw=2.0, zorder=4)
     ax.axhline(1, color=style.GREY, lw=0.7, ls=(0, (3, 2)), zorder=1)
-    ax.text(3.45, 1.0, "vocabulary\naverage", fontsize=6.2, color=style.GREY,
-            va="center", ha="left")
+    ax.text(2.55, 1.18, "vocabulary average", fontsize=6.2, color=style.GREY,
+            va="bottom", ha="center")
     ax.set_yscale("log"); ax.set_ylim(0.2, 12)
     ax.set_yticks([0.3, 1, 3, 10]); ax.set_yticklabels(["0.3", "1", "3", "10"], fontsize=7)
     ax.set_xticks(xs); ax.set_xticklabels(ARM_LAB, fontsize=6.0)
@@ -154,10 +156,10 @@ def panel_c(ax, runs):
                 fontweight="bold" if k == "M05" else "normal")
     ax.set_xscale("log")
     ax.set_xlabel(r"group-lasso $\lambda$", fontsize=7.5)
-    ax.set_ylabel("share of $|w|$  (%)", fontsize=7.5)
+    ax.set_ylabel(r"share of $|w|$  (\%)", fontsize=7.5)
     ax.tick_params(labelsize=7)
     ax.set_xlim(min(lams) * 0.7, max(lams) * 3.2)
-    ax.text(0.03, 0.97, "top module invariant over 50x\n(9/10 runs)",
+    ax.text(0.03, 0.97, "top module invariant\nover 50$\\times$ (9/10 runs)",
             transform=ax.transAxes, fontsize=6.3, va="top", color=style.INK)
 
 
@@ -168,7 +170,7 @@ def build():
 
     fig = plt.figure(figsize=(7.2, 2.55))
     gs = fig.add_gridspec(1, 3, width_ratios=[1.05, 0.95, 1.15], wspace=0.42,
-                          left=0.065, right=0.955, bottom=0.20, top=0.79)
+                          left=0.065, right=0.955, bottom=0.27, top=0.79)
     panel_a(fig.add_subplot(gs[0]), ref[1], ref[2])
     panel_b(fig.add_subplot(gs[1]), runs)
     panel_c(fig.add_subplot(gs[2]), runs)

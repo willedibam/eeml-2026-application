@@ -48,14 +48,19 @@ LAYERS = ["#1d3f5c", "#4a7fa5", "#a8c0cf"]
 
 def use() -> None:
     mpl.rcParams.update({
-        "figure.dpi": 200,
-        "savefig.dpi": 200,
+        # LaTeX for every glyph, so figure type matches poster type exactly.
+        # Latin Modern rather than raw Computer Modern: same shapes, proper T1
+        # encoding, and present in every TeX Live/MacTeX install, so the build
+        # does not depend on a package the next machine might lack.
+        "text.usetex": True,
+        "text.latex.preamble": r"\usepackage[T1]{fontenc}\usepackage{lmodern}",
+        "figure.dpi": 600,
+        "savefig.dpi": 600,
         "savefig.bbox": "tight",
         "savefig.pad_inches": 0.02,
         "figure.facecolor": PAPER,
         "axes.facecolor": PAPER,
-        "font.family": "sans-serif",
-        "font.sans-serif": ["Helvetica Neue", "Helvetica", "Arial", "DejaVu Sans"],
+        "font.family": "serif",
         "font.size": 8,
         "axes.labelsize": 8,
         "axes.titlesize": 9,

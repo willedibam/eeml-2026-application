@@ -75,9 +75,9 @@ def build():
                     color=style.MODELS["fixed-spi"], alpha=0.85, zorder=3)
             mids[lab] += [a, b]
             if ri == 0:
-                ax.text(x - 0.26, a, "R0", fontsize=6.4, ha="right", va="center",
+                ax.text(x - 0.26, a, "linear", fontsize=6.2, ha="right", va="center",
                         color=style.GREY)
-                ax.text(x + 0.26, b, "R1b", fontsize=6.4, ha="left", va="center",
+                ax.text(x + 0.26, b, r"through $x^2$", fontsize=6.2, ha="left", va="center",
                         color=style.GREY)
 
     # Anchor each prediction arrow to ITS OWN axis's data range. Floating them
@@ -93,12 +93,13 @@ def build():
             ha="center", va="top")
 
     ax.set_xticks(list(xs.values()))
-    ax.set_xticklabels(["directed\n& linear", "directed\n& nonlinear", "nonlinear"],
+    ax.set_xticklabels([r"directed" "\n" r"\& linear",
+                        r"directed" "\n" r"\& nonlinear", "nonlinear"],
                        fontsize=7)
     ax.set_xlim(-0.55, 2.78); ax.set_ylim(0, 70)
-    ax.set_ylabel("share of $|w|$  (%)", fontsize=8)
+    ax.set_ylabel(r"share of $|w|$  (\%)", fontsize=8)
     ax.tick_params(labelsize=7)
-    ax.text(0.02, 0.93, "3 reference $\\lambda$ per axis\ndirected & linear falls 3/3",
+    ax.text(0.02, 0.93, r"3 reference $\lambda$ per axis" "\n" r"directed \& linear falls 3/3",
             transform=ax.transAxes, fontsize=6.4, color=style.INK, va="top")
 
     out = ROOT / "figures" / "out"; out.mkdir(exist_ok=True)
