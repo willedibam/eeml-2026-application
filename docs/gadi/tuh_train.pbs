@@ -1,35 +1,38 @@
 #!/bin/bash
-# TUH experiment battery, sharded by seed.
+# TUH experiment battery, sharded by (MODEL, SEED).
 #
-#   qsub docs/gadi/tuh_train.pbs
+#   qsub -v DATA=<dir> docs/gadi/tuh_train.pbs
+#   qsub -v DATA=<dir>,SEEDS=2,NTRAIN=20 docs/gadi/tuh_train.pbs     # smoke test
 #
-# Order matters here. On real EEG the CONTROLS decide whether anything else is
-# interpretable, so they run first and are reported first:
+# CONTROLS decide whether anything else is interpretable, so they are reported
+# first (docs/tuh_report.py):
+#   node-only  per-channel statistics only. If this clears chance the classes
+#              differ in what individual channels DO rather than how they
+#              couple, the SPI vocabulary is mismatched, and the coupling claim
+#              is void -- exactly how motor-imagery and SelfRegulationSCP1
+#              failed (CLAUDE.md scope).
+#   shuffled   SPI values permuted across pairs. Tests that pair correspondence,
+#              not the marginal distribution of values, carries the signal.
 #
-#   node-only   per-channel statistics only. If this clears chance, the classes
-#               differ in what individual channels DO rather than how they
-#               couple, the SPI vocabulary is mismatched, and the coupling claim
-#               is void. This is exactly how motor-imagery and SelfRegulationSCP1
-#               failed (CLAUDE.md scope).
-#   shuffled    SPI values permuted across pairs. Tests that pair correspondence,
-#               not the marginal distribution of SPI values, carries the signal.
+# Every run uses --group-by-patient: TUH cuts several windows per recording, so
+# an instance-level split would put the same subject on both sides.
 #
-# Every run uses --group-by-patient. TUH cuts several windows per recording, so
-# an instance-level random split would place the same subject on both sides and
-# the score would measure memorisation.
+# PARALLELISM. Fits are independent along (model, seed); n_train is NOT, because
+# the SPI filter is computed from the largest n in the process, and because
+# merge_shards would silently drop n-blocks rather than error. So the unit is
+# (model, seed) = 7 x SEEDS processes, each running only its own model over the
+# n grid. Previously four config groups ran on 12 cores and the longest ground
+# through 24 training runs serially.
 #
-# WHY SHARDED. The previous version ran four configs in parallel on 12 cores and
-# used four of them; wall time was set by the longest config running its 60 fits
-# sequentially (~5 h, against a 6 h wall). Fits are independent, so the unit of
-# parallelism is (config, seed): 4 configs x 5 seeds = 20 processes, longest is
-# 12 fits (~1 h). src/analysis.py --merge then recombines the per-seed shards,
-# which is the same path docs/gadi/baselines.pbs already uses.
+# src.analysis --merge recombines SEEDS for one model. It must NOT be used to
+# combine different models: _merge_models iterates the first shard's model dict
+# and silently drops models it lacks. Models are combined at report time.
 
 #PBS -N tuh_train
 #PBS -P ql44
 #PBS -q normal
-#PBS -l ncpus=24
-#PBS -l mem=96GB
+#PBS -l ncpus=48
+#PBS -l mem=190GB
 #PBS -l walltime=06:00:00
 #PBS -l storage=scratch/ql44+gdata/ql44
 #PBS -l wd
@@ -39,8 +42,8 @@ set -uo pipefail
 
 DATA="${DATA:-/scratch/ql44/we2614/mts-spi-data/260728_tuh}"
 SEEDS="${SEEDS:-5}"
-NTRAIN="${NTRAIN:-20 50 100 200}"
-JOBS="${JOBS:-20}"
+NTRAIN="${NTRAIN:-20 50 100 200 400}"
+JOBS="${JOBS:-35}"
 
 module purge
 module load python3/3.12.1
@@ -51,89 +54,64 @@ export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1 KMP_DUPLICATE_LIB_OK=TRUE
 unset CUDA_VISIBLE_DEVICES || true
 mkdir -p logs results
 
-echo "[INFO] TUH battery start $(date)  data=$DATA  seeds=$SEEDS  jobs=$JOBS"
+echo "[INFO] TUH battery $(date)  data=$DATA  seeds=$SEEDS  n=$NTRAIN  jobs=$JOBS"
 
-# REFUSE to run while generation is still going. An instance count alone is not
-# enough: it passes on a partial corpus, and a worker may be mid-write on the
-# very .npz this job is about to read. Each finished shard prints one
-# "sessions ok=N err=M" line to its .o file, so the sessions accounted for must
-# equal the manifest before training is allowed to start.
 MANIFEST="${MANIFEST:-docs/tuh/manifest.csv}"
 WANT=$(grep -vc '^#' "$MANIFEST" 2>/dev/null || echo 0)
 GOT=$(grep -h "sessions ok=" tuh_gen.o* 2>/dev/null \
       | sed -E 's/.*ok=([0-9]+) err=([0-9]+).*/\1 \2/' \
       | awk '{t += $1 + $2} END {print t+0}')
-echo "[INFO] generation accounted for $GOT of $WANT manifest sessions"
 if [ "${ALLOW_PARTIAL:-0}" = "1" ]; then
   echo "[WARN] ALLOW_PARTIAL=1 -- training on a PARTIAL corpus by request."
-  echo "       Controls (node-only, shuffled) are still valid on a subset;"
-  echo "       accuracy and signature will change when the rest arrives."
 elif [ "$WANT" -gt 0 ] && [ "$GOT" -lt "$WANT" ]; then
-  echo "[FATAL] generation incomplete ($GOT/$WANT sessions)."
-  echo "        Shards still running would be written to WHILE this job reads"
-  echo "        them. Wait for 'tuh_gen shards: 0 still running', then resubmit."
+  echo "[FATAL] generation incomplete ($GOT/$WANT sessions). Shards still"
+  echo "        running would be written to WHILE this job reads them."
   exit 6
 fi
 
 for c in fnsz gnsz; do
   n=$(find "$DATA/$c" -name spi_mpis.npz 2>/dev/null | wc -l)
-  echo "  $c: $n instances"
-  [ "$n" -lt 100 ] && { echo "[FATAL] too few $c instances -- refusing to train"; exit 2; }
+  echo "  $c: $n instances, $(ls "$DATA/$c" 2>/dev/null | cut -d_ -f1 | sort -u | wc -l) patients"
+  [ "$n" -lt 100 ] && { echo "[FATAL] too few $c instances"; exit 2; }
 done
 
-# One line per (config, seed). Written to a file and fed to xargs so the whole
-# battery is one bounded pool rather than four serial queues.
+# Stale shards from an earlier run would be picked up by --merge and reported as
+# if they belonged to this one.
+rm -f results/*tuh_*_s[0-9]*_results.json results/tuh_*_merged_results.json
+
 CMDS=$(mktemp)
-emit () {   # tag, models, lambda
+emit () {   # key, models, lambda
   for ((s = 0; s < SEEDS; s++)); do
     printf '%s\n' "python -u -m src.run_pipeline --data-dir '$DATA' \
 --class-names fnsz gnsz --group-by-patient --mode sample-efficiency \
 --n-train $NTRAIN --test-per-class 150 --val-per-class 100 \
 --seeds 1 --seed-offset $s --models $2 --group-lambda $3 \
---spi-groups literature --device cpu --tag ${1}_s${s} \
-> logs/${1}_s${s}.log 2>&1 || echo '### FAIL ${1}_s${s}'" >> "$CMDS"
+--spi-groups literature --device cpu --tag tuh_${1}_s${s} \
+> logs/tuh_${1}_s${s}.log 2>&1 || echo '### FAIL ${1}_s${s}'" >> "$CMDS"
   done
 }
-emit tuh_controls "node-only shuffled" 0.01
-emit tuh_main     "spi-mpnn latent-directed fixed-spi" 0.01
-emit tuh_gl002    "spi-mpnn" 0.002
-emit tuh_gl005    "spi-mpnn" 0.005
+emit node_only       "node-only"       0.01
+emit shuffled        "shuffled"        0.01
+emit spi_mpnn        "spi-mpnn"        0.01
+emit latent_directed "latent-directed" 0.01
+emit fixed_spi       "fixed-spi"       0.01
+emit gl002           "spi-mpnn"        0.002
+emit gl005           "spi-mpnn"        0.005
 
-echo "[INFO] $(wc -l < "$CMDS") shard jobs, pool of $JOBS"
+echo "[INFO] $(wc -l < "$CMDS") shards, pool of $JOBS"
 xargs -P "$JOBS" -I CMD bash -c CMD < "$CMDS"
 rm -f "$CMDS"
 
-for t in tuh_controls tuh_main tuh_gl002 tuh_gl005; do
-  python -m src.analysis --merge "$t" results || echo "### merge FAILED $t"
+for k in node_only shuffled spi_mpnn latent_directed fixed_spi gl002 gl005; do
+  python -m src.analysis --merge "tuh_${k}" results >/dev/null 2>&1 \
+    || echo "### merge FAILED tuh_${k}"
 done
 
 REPORT="logs/tuh_report.txt"
 {
-echo "==================== TUH REPORT ===================="
-for t in tuh_controls tuh_main tuh_gl002 tuh_gl005; do
-  f="results/${t}_merged_results.json"
-  [[ -f "$f" ]] || { echo "-- $t MISSING (see logs/${t}_s*.log)"; continue; }
-  echo; echo "-------- $t --------"
-  grep -m1 "patient-split" "logs/${t}_s0.log" || echo "  [no patient-split line -- CHECK]"
-  python - "$f" <<'PY'
-import json,sys
-r=json.load(open(sys.argv[1]))
-ms=sorted(r['results'][max(r['results'],key=int)]['models'])
-print("  n    " + "".join(f"{m:>20}" for m in ms))
-for n in sorted(r['results'],key=int):
-    d=r['results'][n]['models']
-    print(f"  {n:<5}" + "".join(f"{d[m]['f1_mean']:>13.4f}+/-{d[m]['f1_std']:.2f}" for m in ms))
-PY
-  PYTHONPATH=. python docs/enrichment_2x2.py "$f" 2>/dev/null \
-    | grep -E "F1=|directed |nonlinear|M[0-9]{2} |MXX " || true
-done
+python docs/tuh_report.py results
 echo
-echo "READ THE CONTROLS FIRST."
-echo "  node-only near 0.50 (chance) => classes differ in COUPLING, claim is live."
-echo "  node-only high              => classes differ in per-channel activity;"
-echo "                                 SPI vocabulary mismatched, claim is void."
-echo "  shuffled near 0.50          => pair correspondence carries the signal."
-echo "==================== END ===================="
+PYTHONPATH=. python docs/enrichment_2x2.py results/tuh_spi_mpnn_merged_results.json 2>/dev/null || true
 } | tee "$REPORT"
 
 echo "[INFO] done $(date). report: $REPORT"
