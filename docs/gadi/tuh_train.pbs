@@ -2,7 +2,9 @@
 # TUH experiment battery, sharded by (MODEL, SEED).
 #
 #   qsub -v DATA=<dir> docs/gadi/tuh_train.pbs
-#   qsub -v DATA=<dir>,SEEDS=2,NTRAIN=20 docs/gadi/tuh_train.pbs     # smoke test
+#   qsub -v DATA=<dir>,SEEDS=2,NTRAIN=20,JOBS=14 \
+#        -l ncpus=16,mem=64GB,walltime=00:30:00 \
+#        docs/gadi/tuh_train.pbs                              # smoke test
 #
 # CONTROLS decide whether anything else is interpretable, so they are reported
 # first (docs/tuh_report.py):
