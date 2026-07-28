@@ -1,0 +1,94 @@
+#!/bin/bash
+# The two things the battery failed to deliver, in one job.
+#
+#   qsub docs/gadi/baselines.pbs
+#
+# 1. VALIDITY GATE. R1 reaches F1 0.9987 at n=100 -- easier than R0 (0.9322),
+#    which is backwards for a supposedly harder regime. The R1 coupling is
+#    child += alpha*(parent^2 - s2)/s2, and squaring changes the child's
+#    MARGINAL distribution: a collider's node 0 takes two squared drives, a
+#    chain's node 2 has a parent that is itself squared-driven. So variance and
+#    kurtosis may differ by motif, and node_features includes std. If node-only
+#    scores above chance on R1, the whole R1 signature is confounded -- the
+#    model would not need pairwise coupling at all. node-only MUST sit near
+#    0.33, and `shuffled` (pair correspondence destroyed) must too.
+#
+# 2. THE DECISIVE BASELINE. Does a fair fully-latent model (temporal encoder
+#    over raw series, NRI/MTGNN-style, capacity-validated) match the vocabulary?
+#    If latent-directed ties spi-mpnn at every n, the sample-efficiency argument
+#    is gone and interpretability is the entire contribution.
+#
+# Sharded by seed because the earlier unsharded attempt ran 5+ hours without
+# finishing: 300 fits in one sequential run does not fit an 8 h wall.
+
+#PBS -N eeml_baselines
+#PBS -P ql44
+#PBS -q normal
+#PBS -l ncpus=12
+#PBS -l mem=96GB
+#PBS -l walltime=06:00:00
+#PBS -l storage=scratch/ql44+gdata/ql44
+#PBS -l wd
+#PBS -j oe
+
+set -uo pipefail
+
+R0="${R0:-/scratch/ql44/we2614/mts-spi-data/260727_r0_297}"
+R1="${R1:-/scratch/ql44/we2614/mts-spi-data/260726_r1_nonlinear}"
+SEEDS="${SEEDS:-3}"
+NTRAIN="${NTRAIN:-20 50 100 200 700}"
+MODELS="${MODELS:-spi-mpnn latent-directed node-only shuffled}"
+
+module purge
+module load python3/3.12.1
+export UV_CACHE_DIR="${UV_CACHE_DIR:-/scratch/ql44/we2614/uv-cache}"
+source .venv/bin/activate
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1 KMP_DUPLICATE_LIB_OK=TRUE
+unset CUDA_VISIBLE_DEVICES || true
+mkdir -p logs results
+
+echo "[INFO] start $(date)  seeds=$SEEDS  models=$MODELS"
+
+for ((s=0; s<SEEDS; s++)); do
+  ( python -u -m src.run_pipeline --data-dir "$R0" \
+      --class-names var-chain var-fork var-collider \
+      --mode sample-efficiency --n-train $NTRAIN \
+      --test-per-class 200 --val-per-class 100 --seeds 1 --seed-offset "$s" \
+      --models $MODELS --group-lambda 0.01 --spi-groups literature \
+      --device cpu --tag "r0_base_s${s}" > "logs/r0_base_s${s}.log" 2>&1 ) &
+  ( python -u -m src.run_pipeline --data-dir "$R1" \
+      --class-names r1-nl-chain r1-nl-fork r1-nl-collider \
+      --mode sample-efficiency --n-train $NTRAIN \
+      --test-per-class 200 --val-per-class 100 --seeds 1 --seed-offset "$s" \
+      --models $MODELS --group-lambda 0.01 --spi-groups literature \
+      --device cpu --tag "r1_base_s${s}" > "logs/r1_base_s${s}.log" 2>&1 ) &
+done
+wait
+echo "[INFO] runs done $(date)"
+
+for b in r0_base r1_base; do
+  PYTHONPATH=. python -m src.analysis results --merge "$b" >/dev/null 2>&1 \
+    && echo "### merged $b" || echo "### merge failed $b"
+done
+
+echo
+echo "==================== BASELINES ===================="
+for b in r0_base r1_base; do
+  f="results/${b}_merged_results.json"
+  [[ -f "$f" ]] || { echo "-- $b MISSING"; continue; }
+  echo "-------- $b --------"
+  python - "$f" <<'PY'
+import json,sys
+r=json.load(open(sys.argv[1]))
+ms=sorted(r['results'][max(r['results'],key=int)]['models'])
+print("  n    " + "".join(f"{m:>17}" for m in ms))
+for n in sorted(r['results'],key=int):
+    d=r['results'][n]['models']
+    print(f"  {n:<5}" + "".join(f"{d[m]['f1_mean']:>10.4f}+/-{d[m]['f1_std']:.2f}" for m in ms))
+PY
+done
+echo
+echo "VALIDITY GATE: node-only and shuffled must be near 0.33 on BOTH regimes."
+echo "If node-only is high on r1_base, the R1 signature is confounded."
+echo "==================== END ===================="
