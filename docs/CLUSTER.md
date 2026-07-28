@@ -102,6 +102,32 @@ tslearn/numba pins in the fork.
   `calc.csv` 0.6 MB per dataset against 0.2 MB for `spi_mpis.npz`, the only one
   training reads — ~94% waste.
 
+## Storage: the binding limit is INODES, not bytes
+
+`/scratch` for ql44 is 1 TB but only **202,000 inodes**. This project writes
+**3 files per instance** (`timeseries.npy`, `spi_mpis.npz`, `meta.json`), so a
+3,000-instance dataset costs ~9,000 inodes and the 322-session TUH corpus costs
+~5,300. Four datasets plus a uv cache exhausted the quota at **72 GB of 1 TB --
+7% by bytes, 100% by file count.**
+
+What happens when you go over: PBS puts new and queued jobs in state `H` with
+`Hold_Types = o`, and **a user cannot release an `o` hold** (`qrls` returns
+"Unauthorized Request"). A job already holding an `o` hold must be `qdel`ed and
+resubmitted after you are back under quota. Watch for this on chained jobs --
+`tuh_train` acquired `Hold_Types = so` and would never have started.
+
+Check with `lquota` (shows iUsage/iQuota) or `nci_account`; `du --inodes` is not
+available in Gadi's coreutils, so count with
+`for d in <dir>/*/; do echo "$(find "$d" | wc -l) $d"; done | sort -rn`.
+
+First reclaim should always be `$UV_CACHE_DIR` (~30-60k inodes, pure cache,
+regenerable, and no existing venv breaks -- uv hard-links at install time).
+That alone took this project from 202.5k back to 172.8k.
+
+The real fix, if it recurs: pack each class into a single `.npz` instead of a
+directory per instance. That is a change to `graph_build.py`'s loader, not more
+cleanup.
+
 ## TUH corpus access
 
 Real data, `rsync` over SSH from `nedc-tuh-eeg@www.isip.piconepress.com`,

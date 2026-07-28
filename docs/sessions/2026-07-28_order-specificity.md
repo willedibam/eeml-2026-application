@@ -48,6 +48,15 @@
 - Staging writes to `/scratch/ql44/${USER}/tusz/edf`; I spent an hour reading a
   different path as a stall.
 
+- **Inode quota, not disk, is the storage limit.** 3 files per instance x 4
+  datasets exhausted 202k inodes at 7% of the byte quota. Over-quota puts jobs
+  in `Hold_Types = o`, which a user cannot release -- `qdel` + resubmit is the
+  only route, and it silently blocks chained jobs (`tuh_train` reached `so`).
+  Deleting `$UV_CACHE_DIR` alone recovered 30k inodes at zero scientific cost.
+- I went looking for further deletion targets after the safe one had already
+  fixed it, and nominated another project's data. Wrong: bytes were never the
+  constraint, and the fix was complete before I proposed more.
+
 ## Settings that mattered
 
 - Vocabulary: **297-SPI** `benchmarked90_amortized_config.yaml`, K=283-284 after
