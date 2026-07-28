@@ -63,18 +63,28 @@ for ((s=0; s<SEEDS; s++)); do
       --test-per-class 200 --val-per-class 100 --seeds 1 --seed-offset "$s" \
       --models $MODELS --group-lambda 0.01 --spi-groups literature \
       --device cpu --tag "r1_base_s${s}" > "logs/r1_base_s${s}.log" 2>&1 ) &
+  # STRONG complement to node-only: constant node features, so any performance
+  # must come from pairwise structure. If R1 holds up here AND keeps its M03
+  # signature, the result cannot be riding on per-channel marginals.
+  ( python -u -m src.run_pipeline --data-dir "$R1" \
+      --class-names r1-nl-chain r1-nl-fork r1-nl-collider \
+      --mode sample-efficiency --n-train $NTRAIN \
+      --test-per-class 200 --val-per-class 100 --seeds 1 --seed-offset "$s" \
+      --models spi-mpnn --group-lambda 0.01 --spi-groups literature \
+      --null-node-features \
+      --device cpu --tag "r1_nonode_s${s}" > "logs/r1_nonode_s${s}.log" 2>&1 ) &
 done
 wait
 echo "[INFO] runs done $(date)"
 
-for b in r0_base r1_base; do
+for b in r0_base r1_base r1_nonode; do
   PYTHONPATH=. python -m src.analysis results --merge "$b" >/dev/null 2>&1 \
     && echo "### merged $b" || echo "### merge failed $b"
 done
 
 echo
 echo "==================== BASELINES ===================="
-for b in r0_base r1_base; do
+for b in r0_base r1_base r1_nonode; do
   f="results/${b}_merged_results.json"
   [[ -f "$f" ]] || { echo "-- $b MISSING"; continue; }
   echo "-------- $b --------"
@@ -89,6 +99,10 @@ for n in sorted(r['results'],key=int):
 PY
 done
 echo
+echo "-------- r1_nonode enrichment (constant node features) --------"
+PYTHONPATH=. python docs/enrichment_2x2.py results/r1_nonode_merged_results.json 2>/dev/null | grep -E "F1=|directed |nonlinear|M[0-9]{2} "
+echo
 echo "VALIDITY GATE: node-only and shuffled must be near 0.33 on BOTH regimes."
+echo "STRONG GATE: r1_nonode should stay high AND keep M03 enrichment."
 echo "If node-only is high on r1_base, the R1 signature is confounded."
 echo "==================== END ===================="

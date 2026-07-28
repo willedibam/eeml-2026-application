@@ -161,6 +161,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         "Default 32: a capacity probe showed smaller values "
                         "cannot fit the training set and strawman the baseline.")
     p.add_argument("--dropout", type=float, default=0.1)
+    p.add_argument("--null-node-features", action="store_true",
+                   help="Replace node features with a constant, so the model "
+                        "can only use pairwise structure. This is the strong "
+                        "complement to the node-only control: node-only asks "
+                        "whether marginals SUFFICE, this asks whether the model "
+                        "NEEDS them. Relevant because a nonlinear coupling can "
+                        "shift per-channel variance/kurtosis by motif, and "
+                        "node_features includes std -- so a signature could in "
+                        "principle ride on marginals rather than coupling.")
     p.add_argument("--gate-edges", action="store_true",
                    help="Gate edge features by spi_w: phi(w*E_ij) instead of "
                         "phi(E_ij). Without it, phi sees every SPI regardless "
@@ -428,11 +437,14 @@ def _build_dataset(
     spi_tensors: list[np.ndarray],
     mts_arrays: list[np.ndarray],
     labels: list[int],
+    null_node_features: bool = False,
 ) -> list[Data]:
-    return [
-        build_graph(t, m, l)
-        for t, m, l in zip(spi_tensors, mts_arrays, labels)
-    ]
+    graphs = [build_graph(t, m, l)
+              for t, m, l in zip(spi_tensors, mts_arrays, labels)]
+    if null_node_features:
+        for g in graphs:
+            g.x = torch.ones_like(g.x)
+    return graphs
 
 
 def _scale_tensors(
@@ -514,7 +526,8 @@ def _run_standard(args: argparse.Namespace, data_dir: Path, output_dir: Path) ->
         _, spi_family_indices = assign_spi_families(retained_names)
 
     print("[STAGE] Building PyG graphs...")
-    dataset = _build_dataset(scaled_spi, raw_mts, labels)
+    dataset = _build_dataset(scaled_spi, raw_mts, labels,
+                             args.null_node_features)
     M = dataset[0].num_nodes
     F_n = dataset[0].x.shape[1]
 
@@ -586,6 +599,7 @@ def _run_standard(args: argparse.Namespace, data_dir: Path, output_dir: Path) ->
             "spi_groups": args.spi_groups,
             "group_size": args.group_size,
             "gate_edges": args.gate_edges,
+            "null_node_features": args.null_node_features,
         },
         "models": {},
     }
@@ -774,7 +788,11 @@ def _run_sample_efficiency(
         def _scale_and_build(
             pairs: list[tuple[np.ndarray, np.ndarray, int]]
         ) -> list[Data]:
-            return [build_graph(scaler.transform(s), m, l) for s, m, l in pairs]
+            gs = [build_graph(scaler.transform(s), m, l) for s, m, l in pairs]
+            if args.null_node_features:
+                for g in gs:
+                    g.x = torch.ones_like(g.x)
+            return gs
 
         train_data = _scale_and_build([
             (raw_spi_retained[i], raw_mts[i], labels[i]) for i in train_idx_n
@@ -840,6 +858,7 @@ def _run_sample_efficiency(
             "spi_groups": args.spi_groups,
             "group_size": args.group_size,
             "gate_edges": args.gate_edges,
+            "null_node_features": args.null_node_features,
         },
         "results": results_by_n,
     }
