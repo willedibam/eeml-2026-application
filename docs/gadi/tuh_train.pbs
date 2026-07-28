@@ -1,5 +1,5 @@
 #!/bin/bash
-# TUH experiment battery. Runs after generation (chained via depend=afterok).
+# TUH experiment battery, sharded by seed.
 #
 #   qsub docs/gadi/tuh_train.pbs
 #
@@ -14,17 +14,23 @@
 #   shuffled    SPI values permuted across pairs. Tests that pair correspondence,
 #               not the marginal distribution of SPI values, carries the signal.
 #
-# Every run uses --group-by-patient. TUH cuts ~5.5 windows per recording, so an
-# instance-level random split would place the same subject on both sides and the
-# score would measure memorisation. Inter-subject variance swamping inter-class
-# variance is the documented failure mode for pooled EEG.
+# Every run uses --group-by-patient. TUH cuts several windows per recording, so
+# an instance-level random split would place the same subject on both sides and
+# the score would measure memorisation.
+#
+# WHY SHARDED. The previous version ran four configs in parallel on 12 cores and
+# used four of them; wall time was set by the longest config running its 60 fits
+# sequentially (~5 h, against a 6 h wall). Fits are independent, so the unit of
+# parallelism is (config, seed): 4 configs x 5 seeds = 20 processes, longest is
+# 12 fits (~1 h). src/analysis.py --merge then recombines the per-seed shards,
+# which is the same path docs/gadi/baselines.pbs already uses.
 
 #PBS -N tuh_train
 #PBS -P ql44
 #PBS -q normal
-#PBS -l ncpus=12
+#PBS -l ncpus=24
 #PBS -l mem=96GB
-#PBS -l walltime=04:00:00
+#PBS -l walltime=06:00:00
 #PBS -l storage=scratch/ql44+gdata/ql44
 #PBS -l wd
 #PBS -j oe
@@ -34,7 +40,7 @@ set -uo pipefail
 DATA="${DATA:-/scratch/ql44/we2614/mts-spi-data/260728_tuh}"
 SEEDS="${SEEDS:-5}"
 NTRAIN="${NTRAIN:-20 50 100 200}"
-JOBS="${JOBS:-4}"
+JOBS="${JOBS:-20}"
 
 module purge
 module load python3/3.12.1
@@ -45,36 +51,47 @@ export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1 KMP_DUPLICATE_LIB_OK=TRUE
 unset CUDA_VISIBLE_DEVICES || true
 mkdir -p logs results
 
-echo "[INFO] TUH battery start $(date)  data=$DATA"
+echo "[INFO] TUH battery start $(date)  data=$DATA  seeds=$SEEDS  jobs=$JOBS"
 for c in fnsz gnsz; do
-  echo "  $c: $(find "$DATA/$c" -name spi_mpis.npz 2>/dev/null | wc -l) instances"
+  n=$(find "$DATA/$c" -name spi_mpis.npz 2>/dev/null | wc -l)
+  echo "  $c: $n instances"
+  [ "$n" -lt 100 ] && { echo "[FATAL] too few $c instances -- refusing to train"; exit 2; }
 done
 
-run () {  # tag, models, lambda
-  python -u -m src.run_pipeline --data-dir "$DATA" \
-    --class-names fnsz gnsz --group-by-patient \
-    --mode sample-efficiency --n-train $NTRAIN \
-    --test-per-class 150 --val-per-class 100 --seeds "$SEEDS" \
-    --models $2 --group-lambda "$3" --spi-groups literature \
-    --device cpu --tag "$1" > "logs/$1.log" 2>&1 \
-    && echo "### done $1" || echo "### FAIL $1"
+# One line per (config, seed). Written to a file and fed to xargs so the whole
+# battery is one bounded pool rather than four serial queues.
+CMDS=$(mktemp)
+emit () {   # tag, models, lambda
+  for ((s = 0; s < SEEDS; s++)); do
+    printf '%s\n' "python -u -m src.run_pipeline --data-dir '$DATA' \
+--class-names fnsz gnsz --group-by-patient --mode sample-efficiency \
+--n-train $NTRAIN --test-per-class 150 --val-per-class 100 \
+--seeds 1 --seed-offset $s --models $2 --group-lambda $3 \
+--spi-groups literature --device cpu --tag ${1}_s${s} \
+> logs/${1}_s${s}.log 2>&1 || echo '### FAIL ${1}_s${s}'" >> "$CMDS"
+  done
 }
+emit tuh_controls "node-only shuffled" 0.01
+emit tuh_main     "spi-mpnn latent-directed fixed-spi" 0.01
+emit tuh_gl002    "spi-mpnn" 0.002
+emit tuh_gl005    "spi-mpnn" 0.005
 
-# controls first, then the model, then lambda sensitivity -- all in parallel
-( run tuh_controls "node-only shuffled" 0.01 ) &
-( run tuh_main     "spi-mpnn latent-directed fixed-spi" 0.01 ) &
-( run tuh_gl002    "spi-mpnn" 0.002 ) &
-( run tuh_gl005    "spi-mpnn" 0.005 ) &
-wait
+echo "[INFO] $(wc -l < "$CMDS") shard jobs, pool of $JOBS"
+xargs -P "$JOBS" -I CMD bash -c CMD < "$CMDS"
+rm -f "$CMDS"
+
+for t in tuh_controls tuh_main tuh_gl002 tuh_gl005; do
+  python -m src.analysis --merge "$t" results || echo "### merge FAILED $t"
+done
 
 REPORT="logs/tuh_report.txt"
 {
 echo "==================== TUH REPORT ===================="
 for t in tuh_controls tuh_main tuh_gl002 tuh_gl005; do
-  f="results/sample_efficiency_${t}_results.json"
-  [[ -f "$f" ]] || { echo "-- $t MISSING (see logs/$t.log)"; continue; }
+  f="results/${t}_merged_results.json"
+  [[ -f "$f" ]] || { echo "-- $t MISSING (see logs/${t}_s*.log)"; continue; }
   echo; echo "-------- $t --------"
-  grep -m1 "patient-split" "logs/$t.log" || echo "  [no patient-split line -- CHECK]"
+  grep -m1 "patient-split" "logs/${t}_s0.log" || echo "  [no patient-split line -- CHECK]"
   python - "$f" <<'PY'
 import json,sys
 r=json.load(open(sys.argv[1]))
