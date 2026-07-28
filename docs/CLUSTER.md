@@ -37,6 +37,20 @@ A conda env named `mts-spi` may be active in your shell and will shadow the
 venv. If `which python` is not under `.venv/bin`, run `source .venv/bin/activate`
 again.
 
+**TUH generation needs BOTH environments' contents.** It reads EDFs (`mne`,
+eeml venv) and computes SPIs (`pyspi`, generator venv), so the eeml venv needs
+pyspi installed too:
+
+```bash
+cd /scratch/ql44/we2614/eeml-2026-application && source .venv/bin/activate
+uv pip install -e ~/pyspi-fork      # editable: keeps the fork's te_kraskov DCE edits
+uv pip install mne
+```
+
+Skipping this fails as `ModuleNotFoundError: No module named 'pyspi'` inside the
+worker processes, which surfaces as every session erroring and zero windows
+written — not as an obvious import failure at job start.
+
 ## Queues
 
 | queue | use | note |
