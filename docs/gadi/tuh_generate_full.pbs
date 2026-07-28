@@ -26,7 +26,11 @@ set -uo pipefail
 MANIFEST="${MANIFEST:?set MANIFEST}"
 EDF_ROOT="${EDF_ROOT:-/scratch/ql44/tusz/edf}"
 OUT="${OUT:-/scratch/ql44/we2614/mts-spi-data/260728_tuh}"
-PYSPI_CONFIG="${PYSPI_CONFIG:-/scratch/ql44/we2614/mts-spi-study-cluster/configs/pyspi-v2/benchmarked90_amortized_config.yaml}"
+# The generator repo lives in HOME, not on /scratch (only its data/ and logs/
+# are symlinked out). Getting this wrong throws FileNotFoundError inside every
+# worker, which reads as a data problem rather than a config-path problem.
+GEN_REPO="${GEN_REPO:-$HOME/mts-spi-study-cluster}"
+PYSPI_CONFIG="${PYSPI_CONFIG:-$GEN_REPO/configs/pyspi-v2/benchmarked90_amortized_config.yaml}"
 CHUNK="${CHUNK:-8}"
 SHARD="${PBS_ARRAY_INDEX:-1}"
 
@@ -44,6 +48,13 @@ source "$VENV/bin/activate"
 python -c "import pyspi, mne" || {
   echo "[FATAL] $VENV lacks pyspi or mne. Install mne there:"
   echo "  source $VENV/bin/activate && uv pip install mne"; exit 3; }
+[ -f "$PYSPI_CONFIG" ] || {
+  echo "[FATAL] pyspi config not found: $PYSPI_CONFIG"
+  echo "  set GEN_REPO= or PYSPI_CONFIG= to the right location"; exit 4; }
+[ -d "$EDF_ROOT" ] || { echo "[FATAL] EDF_ROOT missing: $EDF_ROOT"; exit 5; }
+echo "[INFO] venv=$VENV"
+echo "[INFO] pyspi_config=$PYSPI_CONFIG"
+echo "[INFO] edf_root=$EDF_ROOT ($(find "$EDF_ROOT" -name '*.edf' | wc -l) EDFs)"
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
 export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1 KMP_DUPLICATE_LIB_OK=TRUE
 unset CUDA_VISIBLE_DEVICES || true
@@ -90,7 +101,7 @@ def one(row):
     try:
         return (edf.name, G.generate_session(edf, lab, split, Path(out), cfg))
     except Exception as e:
-        return (edf.name, f"ERR {type(e).__name__}: {str(e)[:60]}")
+        return (edf.name, f"ERR {type(e).__name__}: {e}")
 
 ok = err = win = 0
 with ProcessPoolExecutor(max_workers=int(os.environ.get("PBS_NCPUS", 48))) as ex:
