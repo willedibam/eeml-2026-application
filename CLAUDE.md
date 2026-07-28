@@ -71,12 +71,22 @@ python -m src.run_pipeline \
   --n-train 20 50 100 200 500 1000 \
   --test-per-class 200 --val-per-class 100 --seeds 30 \
   --models spi-mpnn fixed-spi correlation latent latent-directed node-only \
-  --device cpu --output-dir results --tag <descriptive_tag>
+  --spi-groups literature --device cpu --output-dir results --tag <tag>
 ```
 
 Validated set (all are CLI defaults): `--warmup-epochs 60 --top-d 5
---group-lambda 0.02 --l1-lambda 0.001 --lr 1e-3 --restarts 2 --batch-size 32
+--group-lambda 0.005 --l1-lambda 0.001 --lr 1e-3 --restarts 2 --batch-size 32
 --max-epochs 200 --patience 20 --hidden 64 --n-layers 2 --dropout 0.1`.
+
+`--group-lambda` was 0.02 for the abstract (unnormalised penalty) and is now
+0.005 for the sqrt(|g|)-normalised one. It must be **re-tuned whenever K
+changes** -- more groups shifts the penalty scale (at K=284, 0.01 is better).
+Select on accuracy AND signature strength across n, not on either alone: they
+trade off (n=100 favours small lambda, n=400 favours large).
+
+**`--group-by-patient` is mandatory for any real-EEG dataset.** Several windows
+are cut per recording, so an instance-level random split puts the same subject
+in train and test and the score measures memorisation.
 
 ## Loss (train.py)
 
@@ -89,10 +99,16 @@ Sparse group lasso on `spi_w` on top of cross-entropy:
   restores the old behaviour for reproducing legacy runs. **Because the penalty
   scale changed, `--group-lambda` likely needs re-tuning; the memory'd 30-seed
   numbers were produced pre-fix.**
-- Family importance is now reported as **per-SPI RMS** `‖w_g‖₂/√|g|`
-  (`analysis.plot_family_norms`, `visualization.plot_family_weights`), not raw
-  summed L2. The abstract's "causal family carries ~3.5× the L2 norm" claim is
-  computed the old (confounded) way and **must be recomputed** before reuse.
+- **Report literature modules, not hand families.** `--spi-groups literature`
+  uses the published Cliff et al. (2023) M01-M14 labels that pyspi carries
+  (cached in `src/spi_labels.json`). Measured on R0-297: module identity
+  explains eta^2=0.575 of the variance in log|w| (z=25.4) versus 0.135 for the
+  hand families, and retains 0.574 after removing the directed/nonlinear axes.
+  Families additionally misfile lagged correlations as "other". **Retire them.**
+- The abstract's "causal family carries ~3.5x the L2 norm" is size-confounded
+  and should be replaced by enrichment against a permutation null
+  (`docs/enrichment_2x2.py`), which has a null distribution and is not
+  size-dependent.
 - `AdamW(weight_decay=1e-4)` also applies implicit L2 to `spi_w`, double-regularising
   the parameter whose sparsity is being interpreted. Consider excluding `spi_w`
   from weight decay if the interpretability story needs to be clean.
@@ -107,6 +123,14 @@ Sparse group lasso on `spi_w` on top of cross-entropy:
 - **Pooled cross-subject EEG**: inter-subject SPI variance ≫ inter-class variance.
 - The method works **only** when classes differ in *how* channels couple, not in
   *what* individual channels do. State this scope explicitly in any writeup.
+- **Always run `node-only` and `shuffled` as validity gates before interpreting
+  anything.** A generator or dataset can leak the class through per-channel
+  marginals: regime R1 (`var_nonlinear_a`) put the nonlinearity in the state
+  update, which changed each node's AR structure by its in-degree, and node
+  features alone then separated chain from collider at 0.91 (chance 0.5) --
+  the task was solvable with no pairwise information at all. Its replacement
+  R1b (`var_obs_nonlinear_a`) applies the nonlinearity at OBSERVATION, which is
+  motif-independent by construction and measures at chance.
 
 Real-world bet: **TUH-EEG Seizure Corpus (TUSZ)**, focal (FNSZ, directed causal
 outflow) vs generalized (GNSZ, symmetric bilateral coherence) — genuinely
@@ -120,9 +144,14 @@ separable by the directed-vs-undirected SPI families. SSH key: `id_ed25519.pub`
    not discovery. Need results on tasks whose optimal statistic is non-obvious
    (nonlinear / directed-nonlinear) so recovery becomes a finding.
 2. **No successful real-world result yet** (see scope). TUH is the plan.
-3. **fixed-spi matches spi-mpnn**, so the contribution is "SPIs are good edge
-   features" + interpretability of `w`, not topology-learning superiority. Frame
-   accordingly; do not overclaim.
+3. **fixed-spi matches spi-mpnn**, confirmed at M=20 where top-d retains 26% of
+   edges rather than 56% (1.0000 vs 0.9987), so this is structural, not an M
+   artifact. `w` is **not load-bearing for performance**. Two attempts to make
+   it so both failed: interpreting `w` from `edge-ablation` collapses F1 to
+   0.434, and gating edge features by `w` (`--gate-edges`) costs 0.32 F1. The
+   supported claim is therefore: *a linear probe can be added at no accuracy
+   cost and recovers the generating mechanism at module level* -- a diagnostic
+   overlay, not a performance component.
 4. Novelty vs multi-connectivity / attention GNNs (e.g. sriramulu2023) needs a
    head-to-head, not a dismissal.
 
