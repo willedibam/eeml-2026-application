@@ -14,9 +14,9 @@
 #PBS -N tuh_gen
 #PBS -P ql44
 #PBS -q normal
-#PBS -l ncpus=48
-#PBS -l mem=190GB
-#PBS -l walltime=02:00:00
+#PBS -l ncpus=24
+#PBS -l mem=96GB
+#PBS -l walltime=05:00:00
 #PBS -l storage=scratch/ql44+gdata/ql44
 #PBS -l wd
 #PBS -j oe
@@ -24,14 +24,14 @@
 set -uo pipefail
 
 MANIFEST="${MANIFEST:?set MANIFEST}"
-EDF_ROOT="${EDF_ROOT:-/scratch/ql44/tusz/edf}"
+EDF_ROOT="${EDF_ROOT:-/scratch/ql44/we2614/tusz/edf}"
 OUT="${OUT:-/scratch/ql44/we2614/mts-spi-data/260728_tuh}"
 # The generator repo lives in HOME, not on /scratch (only its data/ and logs/
 # are symlinked out). Getting this wrong throws FileNotFoundError inside every
 # worker, which reads as a data problem rather than a config-path problem.
 GEN_REPO="${GEN_REPO:-$HOME/mts-spi-study-cluster}"
 PYSPI_CONFIG="${PYSPI_CONFIG:-$GEN_REPO/configs/pyspi-v2/benchmarked90_amortized_config.yaml}"
-CHUNK="${CHUNK:-8}"
+CHUNK="${CHUNK:-24}"
 SHARD="${PBS_ARRAY_INDEX:-1}"
 
 module purge

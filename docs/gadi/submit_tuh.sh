@@ -3,7 +3,7 @@
 #   bash docs/gadi/submit_tuh.sh docs/tuh/manifest.csv [chunk]
 set -euo pipefail
 MANIFEST="${1:?manifest}"
-CHUNK="${2:-8}"
+CHUNK="${2:-24}"
 N=$(grep -vc '^#' "$MANIFEST")
 SUBJOBS=$(( (N + CHUNK - 1) / CHUNK ))
 echo "[INFO] $N sessions, chunk=$CHUNK -> $SUBJOBS subjobs"

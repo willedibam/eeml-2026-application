@@ -19,6 +19,11 @@ TAG="${3:?tag}"
 LAMBDA="${4:-0.01}"
 SEEDS="${5:-5}"
 NTRAIN="${NTRAIN:-100 400 700}"
+# Default is the probe alone. Override to add controls/upper bounds, e.g.
+#   MODELS="spi-mpnn fixed-spi latent-directed node-only shuffled"
+# A near-chance spi-mpnn score is uninterpretable on its own: it cannot
+# distinguish an unsolvable task from a failing model.
+MODELS="${MODELS:-spi-mpnn}"
 
 CLS="${CLASSES//,/ }"
 cd "$(dirname "$0")/.."
@@ -39,7 +44,7 @@ python -u -m src.run_pipeline \
   --n-train $NTRAIN \
   --test-per-class 200 --val-per-class 100 \
   --seeds "$SEEDS" \
-  --models spi-mpnn \
+  --models $MODELS \
   --group-lambda "$LAMBDA" \
   --spi-groups literature \
   --device cpu --tag "$TAG" 2>&1 | grep -E "Retained|SPI-MODULES|F1=" | tail -20
@@ -50,9 +55,11 @@ echo "=== accuracy ==="
 python - "$RES" <<'PY'
 import json,sys
 r=json.load(open(sys.argv[1]))
+ms=sorted(r['results'][max(r['results'],key=int)]['models'])
+print("  n    " + "".join(f"{m:>22}" for m in ms))
 for n in sorted(r['results'],key=int):
-    b=r['results'][n]['models']['spi-mpnn']
-    print(f"  n={n:>4}  F1={b['f1_mean']:.4f} +/- {b['f1_std']:.4f}")
+    d=r['results'][n]['models']
+    print(f"  {n:<5}" + "".join(f"{d[m]['f1_mean']:>15.4f}+/-{d[m]['f1_std']:.2f}" for m in ms))
 PY
 
 echo
