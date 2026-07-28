@@ -191,7 +191,53 @@ Conclusion: discrimination flows through `phi` over the full vocabulary;
 
 ---
 
-## 5. Reproducing
+## 5. Current state (2026-07-28, update when it changes)
+
+**In flight**
+- R1b training (`docs/run_regime.sh ... r1b 0.01 5`) — does the signature shift
+  toward nonlinear modules when coupling is nonlinear? Data is complete
+  (3000/3000, balanced, 0 truncated) at
+  `/scratch/ql44/we2614/mts-spi-data/260728_r1b_obs`.
+- `eeml_baselines` PBS — validity gate (`node-only`, `shuffled`) plus the
+  latent-vs-vocabulary comparison, on R0 and the old R1, sharded by seed.
+- TUH chain (`docs/gadi/tuh_pipeline.sh`, login node, tmux) — stages 322
+  sessions (~7 GB, ~2 h), then generation, then `tuh_train.pbs` chained via
+  `depend=afterok`.
+
+**Outputs to collect**
+```
+logs/tuh_report.txt                        # TUH battery, controls first
+eeml_baselines.o*        (BASELINES block) # latent vs vocabulary
+logs/r1b.log / the run_regime report       # R1b enrichment
+```
+
+**Paths**
+| what | where |
+|---|---|
+| eeml repo (Gadi) | `/scratch/ql44/we2614/eeml-2026-application` |
+| generator repo (Gadi) | `~/mts-spi-study-cluster` (branch `refactor-lagged-warping`) |
+| synthetic data | `/scratch/ql44/we2614/mts-spi-data/{260727_r0_297,260728_r1b_obs}` |
+| staged EDFs | `/scratch/ql44/tusz/edf` |
+| TUH output | `/scratch/ql44/we2614/mts-spi-data/260728_tuh` |
+
+**Decided, do not relitigate**
+- Report literature modules; families are retired (eta^2 0.575 vs 0.135).
+- `w` is a diagnostic overlay, not a performance component.
+- Skip Kuramoto; the collider-vs-rest binary task is the tighter negative
+  control and is free.
+- After R1b, stop adding synthetic regimes and go to TUH.
+
+**Next decisions, gated on the above**
+1. If TUH `node-only` clears chance → coupling claim is void there; report the
+   scope limit rather than the enrichment.
+2. If `latent-directed` ties `spi-mpnn` at every n → drop all
+   sample-efficiency language; the contribution is interpretability alone.
+3. If R1b shows no shift → the method reads directedness but not mechanism
+   type; publishable as a limitation.
+
+---
+
+## 6. Reproducing
 
 ```bash
 # regime report: integrity, accuracy, 2x2 + module enrichment, stability, CIs
