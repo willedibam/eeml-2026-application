@@ -340,6 +340,139 @@ its rank is not identified. M06 is enriched (1.45x) at the smallest lambda
 tested, so the depletion is 9/10, not universal. And this is one dataset: it
 describes R0 until a second regime tests the prediction.
 
+### 2.4b The 2/3 ceiling: two DIFFERENT ceilings, do not conflate them
+
+I previously recorded that "both earlier claims were wrong" and that chain and
+collider are the confusable pair. That entry was itself wrong: it generalised a
+measurement of ONE symmetric statistic into a claim about all of them.
+
+**Under a general symmetric statistic (lagged included).** Chain (0->1->2) and
+fork (0->1, 0->2) are Markov-equivalent: same unlabelled skeleton, no
+v-structure, and identical weighted skeletons {alpha, alpha, alpha^2}. The
+collider (1->0, 2->0) has {alpha, alpha, 0} because its parents are uncoupled.
+So chain and fork collapse, collider separates, and the ceiling is **2/3**.
+This is the abstract's claim (Verma & Pearl 1990) and it is correct.
+
+**Under CONTEMPORANEOUS Pearson specifically.** The VAR has no self-persistence
+(A has a zero diagonal), so X_0[t] is independent of X_0[t-1] and a directly
+coupled pair has ~zero INSTANTANEOUS correlation. Only the fork produces
+instantaneous coupling, because its two children are driven by the same parent
+value. Measured over 400 instances per motif at M=3, sorted |rho| triples:
+
+| motif | min | mid | max |
+|---|---|---|---|
+| chain | 0.015 | 0.032 | 0.056 |
+| collider | 0.015 | 0.032 | 0.058 |
+| fork | 0.020 | 0.048 | 0.206 |
+
+Separability from that triple alone: chain vs collider **0.529** (chance 0.5),
+chain vs fork 0.840, 3-way **0.582**. So under contemporaneous Pearson it is
+CHAIN and COLLIDER that collapse -- the opposite pair -- and the achievable
+accuracy is 0.582, well BELOW the general 2/3 ceiling.
+
+**Both are true, at different scopes**, and the pipeline confirms it: the
+`correlation` baseline uses contemporaneous Pearson |r| and measures 0.59,
+matching the 0.582 predicted here rather than the 2/3 bound. The abstract
+already says this ("the gap between ceiling and observed 59% arises because
+top-d sparsification selects high-correlation nuisance pairs"); the measurement
+here gives a second and simpler reason -- contemporaneous Pearson is a strictly
+weaker symmetric statistic than the bound assumes.
+
+For any figure: annotate 2/3 as the SYMMETRIC-STATISTIC ceiling and 0.59 as what
+contemporaneous Pearson actually achieves. Do not present 0.582 as "the"
+ceiling.
+
+### 2.5a R1b: a SECOND valid regime, fully gated (2026-07-29)
+
+R1b (`var_obs_nonlinear_a`: linear VAR observed through `x^2`) is established.
+The first pass was void -- at chance, with no controls and lambda left at the
+R0-tuned 0.01. At **lambda=0.001** with the full control panel (n=700, 3 seeds):
+
+| model | F1 |
+|---|---|
+| `spi-mpnn` | **0.6727** +/- 0.098 |
+| `fixed-spi` | 0.6837 +/- 0.164 |
+| `node-only` | 0.3304 +/- 0.02 |
+| `shuffled` | 0.3066 +/- 0.02 |
+| `latent-directed` | 0.3071 +/- 0.03 |
+
+Chance is 0.333. `validity_report` returns **INTERPRETABLE** -- the first
+regime to pass every gate in one file.
+
+Three things this establishes that R0 does not:
+- **No marginal leakage** (`node-only` at chance), unlike withdrawn R1.
+- **Pair correspondence is necessary** (`shuffled` at chance at every n),
+  unlike R0 where `shuffled` climbs to 0.82 by n=1000.
+- **The vocabulary is necessary.** `latent-directed` sits at chance at every n
+  while the SPI probe reaches 0.67. A capacity-validated latent model on raw
+  series cannot do this task at all.
+
+Independent confirmation of the accuracy: lambda=0.0002 gave 0.6721 and
+lambda=0.001 gave 0.6727, from separate runs.
+
+**The pre-registered prediction held.** `nonlinear` enrichment 1.46x (z=3.5);
+top modules **M09 4.26x (z=4.7)** and **M10 3.05x (z=5.9)**, both DTW/LCS
+families; the top six SPIs are all nonlinear (`bary-sq_dtw_mean`, `gwtau`,
+`lcss`, `dtw`). Against R0, where M05 (parametric Granger) and M01
+(phase-spectral) lead and both are LINEAR. Cross-regime, measured against three
+R0 lambdas: `directed & linear` **falls in 3/3** (-14 to -28pp, CI excludes 0
+each time), `directed & nonlinear` rises in 2/3. Stability is better than R0
+too: `top1-SPI = 1.00`, all three seeds agreeing on `bary-sq_dtw_mean`.
+
+**The caveat, and it matters.** 0.6727 is suspiciously close to 2/3, and the
+report warns `little enrichment -- the model is not preferentially using
+directed statistics` (directed 1.27x, z=2.1). The DTW/LCS measures carrying the
+signature are SYMMETRIC. So the likely reading is that `x^2` renders the
+directional information unusable and the probe falls back to an undirected
+solution, which is ceiling-limited. That would explain the weak directed
+enrichment, the symmetric-measure dominance and the plateau simultaneously.
+
+Not yet resolved: accuracy is still rising (n=400 -> 0.528, n=700 -> 0.673), so
+it may exceed 2/3 with more data. **The decisive test is cheap**: re-run R1b on
+the UNDIRECTED sub-vocabulary only. If that also reaches ~0.67, the probe is not
+using direction and the claim becomes "recovers THAT channels couple, not which
+way, once direction is obscured" -- a scope boundary with a mechanism, weaker
+than mechanism recovery but honest and publishable.
+
+### 2.5b Parametric beats nonparametric WITHIN the directed-spectral class
+
+The strongest synthetic result, and the one that is not the tautology.
+
+Measured across **10 independent lambda runs** on R0-297 (two separate sweeps,
+lambda 0.001-0.05, a 50x range):
+
+| module | what it contains | K | enrichment (median) | range |
+|---|---|---|---|---|
+| M01 | CoherencePhase, PhaseSlopeIndex, GroupDelay, PhaseLagIndex (band) | 6 | **6.98x** | 3.12-14.16, enriched in 10/10 |
+| M05 | **parametric** spectral GC, TE-gaussian, TE-symbolic, phi*, SI-gaussian | 20 | **4.41x** | 3.20-6.63, enriched in 10/10 |
+| M06 | **nonparametric** directed spectral: DTF, DC, PDC, GPDC, dDTF, sGC-nonparametric | 42 | **0.54x** | 0.27-1.45, depleted in 9/10 |
+
+M05 and M06 are **both directed and both spectral**. A directed-vs-undirected
+analysis lumps them together; the probe separates them, and does so consistently
+across a 50x lambda range and two independent sweeps. 42 directed-spectral SPIs
+are actively *depleted* -- they carry less weight than their share of the
+vocabulary.
+
+**Why this is a claim and not a restatement of the generator.** "Granger wins on
+a VAR" is entailed. "Among estimators that all target directed spectral
+influence, the *correctly specified parametric* ones dominate and the
+factorization-based nonparametric ones are depleted" is a statement about
+**estimator efficiency under correct specification** -- R0 is a VAR(1), so the
+parametric AR model is correctly specified, and parametric spectral GC estimates
+its coefficients directly where DTF/PDC/nonparametric-sGC go through spectral
+density factorization. That is a statistical fact the probe recovered, not a
+physics fact built into the generator.
+
+**It is falsifiable.** On a generator that is not an AR process, or where AR
+order is misspecified, M06 should stop being depleted relative to M05, or the
+ordering should flip. That prediction is the reason a second valid regime
+matters.
+
+**Caveats, stated.** M01's enrichment varies 3.12-14.16 (K=6, high variance) --
+its rank is not identified. M06 is enriched (1.45x) at the smallest lambda
+tested, so the depletion is 9/10, not universal. And this is one dataset: it
+describes R0 until a second regime tests the prediction.
+
 ### 2.4b The 2/3 ceiling: CHAIN and COLLIDER are the confusable pair (measured)
 
 Asserted two different wrong ways before being measured. The correct statement
