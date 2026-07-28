@@ -198,6 +198,12 @@ def session_windows(edf: Path, csv_lab: Path, split: str,
             ts = zscore(win)                        # (T, M)
             name = f"{patient}__{session}__s{int(span[0])}_w{k}"
             d = out_root / seiz_type / name
+            if (d / "meta.json").exists():
+                # Already complete. Do NOT rewrite its timeseries: a kill during
+                # that write would corrupt an instance that was already good,
+                # which is a worse outcome than the work we would save.
+                dirs.append(d)
+                continue
             d.mkdir(parents=True, exist_ok=True)
             np.save(d / "timeseries.npy", ts)
             (d / ".source.json").write_text(json.dumps(
