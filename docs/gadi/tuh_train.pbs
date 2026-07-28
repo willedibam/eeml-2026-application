@@ -44,8 +44,13 @@ set -uo pipefail
 
 DATA="${DATA:-/scratch/ql44/we2614/mts-spi-data/260728_tuh}"
 SEEDS="${SEEDS:-5}"
-NTRAIN="${NTRAIN:-20 50 100 200 400}"
-JOBS="${JOBS:-35}"
+# 350 not 400: the patient-disjoint pool caps at 363/class on the partial
+# corpus (measured), and run_pipeline silently DROPS any n above the pool.
+NTRAIN="${NTRAIN:-20 50 100 200 350}"
+# 4.1 GB/shard measured (57 GB for 14). 35 shards would be ~143 GB of 190;
+# 24 leaves real headroom, since n=350 holds more graphs than the n=20
+# smoke run that produced the measurement.
+JOBS="${JOBS:-24}"
 
 module purge
 module load python3/3.12.1

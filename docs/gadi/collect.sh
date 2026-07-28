@@ -8,7 +8,10 @@
 # Per-shard logs under logs/ are written live and are readable during the run.
 set -uo pipefail
 cd "$(dirname "$0")/../.." || exit 1
-O="${1:-$(ls -t ./*.o[0-9]* 2>/dev/null | head -1)}"
+# Prefer the training job's log. Falling back to "newest .o file" picked a
+# tuh_gen log while training was still running and its .o did not exist yet.
+O="${1:-$(ls -t ./tuh_train.o[0-9]* 2>/dev/null | head -1)}"
+O="${O:-$(ls -t ./*.o[0-9]* 2>/dev/null | head -1)}"
 
 echo "=============== JOB LOG: ${O:-none} ==============="
 [ -n "${O:-}" ] && [ -f "$O" ] && head -25 "$O" || echo "  (no .o file yet -- job still running?)"
@@ -34,4 +37,10 @@ lg=$(ls logs/tuh_*_s[0-9]*.log 2>/dev/null | wc -l)
 echo "  $ok result files from $lg shard logs"
 echo
 echo "=============== REPORT ==============="
-[ -f logs/tuh_report.txt ] && cat logs/tuh_report.txt || echo "  logs/tuh_report.txt not written"
+if [ -f logs/tuh_report.txt ]; then
+  age=$(( $(date +%s) - $(stat -c %Y logs/tuh_report.txt 2>/dev/null || echo 0) ))
+  [ "$age" -gt 1800 ] && echo "  [WARN] report is $((age/60)) min old -- likely STALE from a previous job"
+  cat logs/tuh_report.txt
+else
+  echo "  logs/tuh_report.txt not written"
+fi
