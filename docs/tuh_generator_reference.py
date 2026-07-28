@@ -187,7 +187,11 @@ def generate_session(edf: Path, csv_lab: Path, split: str, out_root: Path,
             ts = zscore(win)                        # (T, M)
             spis = run_pyspi(ts, pyspi_config)
             name = f"{patient}__{session}__s{int(span[0])}_w{k}"
-            d = out_root / split / seiz_type / name
+            # Flat class dirs: <out_root>/<fnsz|gnsz>/<instance>. The eeml
+            # pipeline discovers classes as immediate subdirectories, and the
+            # official split is recorded in meta.json instead -- splitting is
+            # done by PATIENT at training time, not by directory.
+            d = out_root / seiz_type / name
             d.mkdir(parents=True, exist_ok=True)
             np.save(d / "timeseries.npy", ts)
             np.savez(d / "spi_mpis.npz", **spis)

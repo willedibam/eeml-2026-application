@@ -90,7 +90,7 @@ from .model import (
     SubsetSPIMPNN,
 )
 from .train import TrainConfig, TrainResult, train_model
-from .utils import dump_json, project_root, to_relative
+from .utils import dump_json, load_json, project_root, to_relative
 
 # Fixed seeds for data splitting — never change these mid-experiment
 _SPLIT_SEED = 42   # stratified split (standard mode)
@@ -244,6 +244,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--subset-spi", nargs="+", default=None,
                    help="SPI name prefixes for subset-spi model (e.g. 'sgc_parametric_mean' "
                         "'gc_gaussian'). Each prefix matches the first retained SPI.")
+    p.add_argument("--group-by-patient", action="store_true",
+                   help="Split train/val/test so that no PATIENT appears in "
+                        "more than one of them, reading meta.json "
+                        "source.patient. Mandatory for TUH: several windows are "
+                        "cut from each recording, so an instance-level random "
+                        "split puts the same subject on both sides and the "
+                        "result measures memorisation. Inter-subject variance "
+                        "exceeding inter-class variance is exactly how the "
+                        "earlier pooled-EEG attempts failed.")
     p.add_argument("--instance-range", type=int, nargs=2, default=None,
                    metavar=("START", "END"),
                    help="Only load instances with index in [START, END] (inclusive). "
@@ -309,7 +318,7 @@ def _load_all_data(
     sample-efficiency pool must still be drawn per DIRECTORY, or two merged
     classes would sample the same instances twice.
     """
-    spi_tensors, mts_arrays, labels, paths, src = [], [], [], [], []
+    spi_tensors, mts_arrays, labels, paths, src, patients = [], [], [], [], [], []
     for class_name, dirs in datasets_by_class.items():
         label = class_to_label[class_name]
         for d in dirs:
@@ -321,9 +330,14 @@ def _load_all_data(
                 labels.append(label)
                 paths.append(d)
                 src.append(class_name)
+                try:
+                    pid = load_json(d / "meta.json").get("source", {}).get("patient")
+                except Exception:
+                    pid = None
+                patients.append(pid if pid is not None else str(d))
             except Exception as e:
                 print(f"[WARN] Skipping {d}: {e}")
-    return spi_tensors, mts_arrays, labels, paths, src
+    return spi_tensors, mts_arrays, labels, paths, src, patients
 
 
 # ---------------------------------------------------------------------------
@@ -489,7 +503,7 @@ def _run_standard(args: argparse.Namespace, data_dir: Path, output_dir: Path) ->
     all_spi_names = load_spi_names(first_dir)
 
     print("[STAGE] Loading data...")
-    raw_spi, raw_mts, labels, _, src_class = _load_all_data(
+    raw_spi, raw_mts, labels, _, src_class, patient_ids = _load_all_data(
         datasets_by_class, all_spi_names, class_to_label
     )
     n = len(raw_spi)
@@ -597,6 +611,7 @@ def _run_standard(args: argparse.Namespace, data_dir: Path, output_dir: Path) ->
             "top_d": args.top_d,
             "no_cosine_decay": args.no_cosine_decay,
             "spi_groups": args.spi_groups,
+            "group_by_patient": args.group_by_patient,
             "group_size": args.group_size,
             "gate_edges": args.gate_edges,
             "null_node_features": args.null_node_features,
@@ -658,7 +673,7 @@ def _run_sample_efficiency(
     all_spi_names = load_spi_names(first_dir)
 
     print("[STAGE] Loading all data...")
-    raw_spi, raw_mts, labels, _, src_class = _load_all_data(
+    raw_spi, raw_mts, labels, _, src_class, patient_ids = _load_all_data(
         datasets_by_class, all_spi_names, class_to_label
     )
     n = len(raw_spi)
@@ -670,21 +685,53 @@ def _run_sample_efficiency(
     if n < needed_fixed + n_classes:
         print("[ERROR] Insufficient total samples"); return
 
-    # First carve out fixed test set
     idx = np.arange(n)
-    pool_idx, test_idx = train_test_split(
-        idx,
-        test_size=n_test * n_classes,
-        stratify=labels_arr,
-        random_state=_POOL_SEED,
-    )
-    # Then carve out fixed val set from the pool
-    pool_idx, val_idx = train_test_split(
-        pool_idx,
-        test_size=n_val * n_classes,
-        stratify=labels_arr[pool_idx],
-        random_state=_POOL_SEED,
-    )
+    if args.group_by_patient:
+        # Assign whole PATIENTS to test, then val, then the training pool, so no
+        # subject spans two splits. Sizes are approximate because patients
+        # contribute unequal numbers of windows; exact per-class quotas are not
+        # achievable without breaking subjects apart, which is the thing being
+        # prevented.
+        pat = np.array(patient_ids)
+        uniq = np.array(sorted(set(pat)))
+        rng_p = np.random.default_rng(_POOL_SEED)
+        uniq = rng_p.permutation(uniq)
+        want_test = n_test * n_classes
+        want_val = n_val * n_classes
+        test_pats, val_pats, taken_t, taken_v = [], [], 0, 0
+        for p_ in uniq:
+            k = int((pat == p_).sum())
+            if taken_t < want_test:
+                test_pats.append(p_); taken_t += k
+            elif taken_v < want_val:
+                val_pats.append(p_); taken_v += k
+        test_mask = np.isin(pat, test_pats)
+        val_mask = np.isin(pat, val_pats)
+        test_idx = idx[test_mask]
+        val_idx = idx[val_mask]
+        pool_idx = idx[~(test_mask | val_mask)]
+        print(f"  [patient-split] {len(set(pat))} patients -> "
+              f"test {len(test_pats)}p/{len(test_idx)}w, "
+              f"val {len(val_pats)}p/{len(val_idx)}w, "
+              f"pool {len(set(pat[pool_idx]))}p/{len(pool_idx)}w")
+        overlap = (set(pat[test_idx]) & set(pat[pool_idx])) | \
+                  (set(pat[val_idx]) & set(pat[pool_idx]))
+        assert not overlap, f"patient leakage: {overlap}"
+    else:
+        # First carve out fixed test set
+        pool_idx, test_idx = train_test_split(
+            idx,
+            test_size=n_test * n_classes,
+            stratify=labels_arr,
+            random_state=_POOL_SEED,
+        )
+        # Then carve out fixed val set from the pool
+        pool_idx, val_idx = train_test_split(
+            pool_idx,
+            test_size=n_val * n_classes,
+            stratify=labels_arr[pool_idx],
+            random_state=_POOL_SEED,
+        )
 
     print(f"  Fixed test: {len(test_idx)}, Fixed val: {len(val_idx)}, Pool: {len(pool_idx)}")
 
@@ -856,6 +903,7 @@ def _run_sample_efficiency(
             "top_d": args.top_d,
             "no_cosine_decay": args.no_cosine_decay,
             "spi_groups": args.spi_groups,
+            "group_by_patient": args.group_by_patient,
             "group_size": args.group_size,
             "gate_edges": args.gate_edges,
             "null_node_features": args.null_node_features,
