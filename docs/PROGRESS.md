@@ -249,6 +249,58 @@ by sharding the two long runs across seeds via `--seed-offset`.
 
 ---
 
+### 2.5a R1b: a SECOND valid regime, fully gated (2026-07-29)
+
+R1b (`var_obs_nonlinear_a`: linear VAR observed through `x^2`) is established.
+The first pass was void -- at chance, with no controls and lambda left at the
+R0-tuned 0.01. At **lambda=0.001** with the full control panel (n=700, 3 seeds):
+
+| model | F1 |
+|---|---|
+| `spi-mpnn` | **0.6727** +/- 0.098 |
+| `fixed-spi` | 0.6837 +/- 0.164 |
+| `node-only` | 0.3304 +/- 0.02 |
+| `shuffled` | 0.3066 +/- 0.02 |
+| `latent-directed` | 0.3071 +/- 0.03 |
+
+Chance is 0.333. `validity_report` returns **INTERPRETABLE** -- the first
+regime to pass every gate in one file.
+
+Three things this establishes that R0 does not:
+- **No marginal leakage** (`node-only` at chance), unlike withdrawn R1.
+- **Pair correspondence is necessary** (`shuffled` at chance at every n),
+  unlike R0 where `shuffled` climbs to 0.82 by n=1000.
+- **The vocabulary is necessary.** `latent-directed` sits at chance at every n
+  while the SPI probe reaches 0.67. A capacity-validated latent model on raw
+  series cannot do this task at all.
+
+Independent confirmation of the accuracy: lambda=0.0002 gave 0.6721 and
+lambda=0.001 gave 0.6727, from separate runs.
+
+**The pre-registered prediction held.** `nonlinear` enrichment 1.46x (z=3.5);
+top modules **M09 4.26x (z=4.7)** and **M10 3.05x (z=5.9)**, both DTW/LCS
+families; the top six SPIs are all nonlinear (`bary-sq_dtw_mean`, `gwtau`,
+`lcss`, `dtw`). Against R0, where M05 (parametric Granger) and M01
+(phase-spectral) lead and both are LINEAR. Cross-regime, measured against three
+R0 lambdas: `directed & linear` **falls in 3/3** (-14 to -28pp, CI excludes 0
+each time), `directed & nonlinear` rises in 2/3. Stability is better than R0
+too: `top1-SPI = 1.00`, all three seeds agreeing on `bary-sq_dtw_mean`.
+
+**The caveat, and it matters.** 0.6727 is suspiciously close to 2/3, and the
+report warns `little enrichment -- the model is not preferentially using
+directed statistics` (directed 1.27x, z=2.1). The DTW/LCS measures carrying the
+signature are SYMMETRIC. So the likely reading is that `x^2` renders the
+directional information unusable and the probe falls back to an undirected
+solution, which is ceiling-limited. That would explain the weak directed
+enrichment, the symmetric-measure dominance and the plateau simultaneously.
+
+Not yet resolved: accuracy is still rising (n=400 -> 0.528, n=700 -> 0.673), so
+it may exceed 2/3 with more data. **The decisive test is cheap**: re-run R1b on
+the UNDIRECTED sub-vocabulary only. If that also reaches ~0.67, the probe is not
+using direction and the claim becomes "recovers THAT channels couple, not which
+way, once direction is obscured" -- a scope boundary with a mechanism, weaker
+than mechanism recovery but honest and publishable.
+
 ### 2.5b Parametric beats nonparametric WITHIN the directed-spectral class
 
 The strongest synthetic result, and the one that is not the tautology.

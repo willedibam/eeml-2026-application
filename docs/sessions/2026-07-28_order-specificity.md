@@ -68,6 +68,20 @@
   GB/worker peak, ~36 min/window at 24-worker contention (20.6 at 8).
   322 sessions -> ~1771 windows, ~3.3 h.
 
+## Late addition (2026-07-29)
+
+- **R1b established as a second valid regime**, fully gated: F1 0.673 at n=700,
+  `node-only`/`shuffled`/`latent-directed` all at chance. Needed lambda=0.001,
+  ~10-50x below R0's, because `x^2` squares the coupling.
+- Signature moves to nonlinear DTW/LCS (M09 4.26x, M10 3.05x) from R0's linear
+  Granger/phase -- the direction stated in the generator docstring beforehand.
+- But F1 ~ 2/3 and directed enrichment is weak, so the probe may be solving it
+  undirected and ceiling-limited. Untested; the undirected-subvocabulary run
+  settles it.
+- Seven regeneration shards ran 70 min of pure rework because PBS snapshots the
+  script at SUBMISSION -- they predated the resumable refactor. Pulling later
+  does not reach a queued job.
+
 ## Open
 
 - R1b lambda sweep accuracy — the number that decides the synthetic programme.
