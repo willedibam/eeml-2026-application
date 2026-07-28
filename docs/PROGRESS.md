@@ -153,7 +153,65 @@ Both were attempts to make `w` load-bearing. Recorded as negative results.
 Conclusion: discrimination flows through `phi` over the full vocabulary;
 `w` selects topology. This is consistent with `fixed-spi` tying.
 
-### 3.3 Bugs found (all fixed; each would have corrupted conclusions)
+### 3.3 Dead ends — things built, measured, and abandoned
+
+Recorded because re-deriving them is expensive and because several look
+attractive enough to be tried again.
+
+**Effective-dimension group weighting** (`--group-size effective`, kept in the
+code, default off). The sqrt(p_g) group-lasso weight is derived under
+within-group ORTHONORMAL design (Yuan & Lin recommend orthonormalising each
+group first). This vocabulary violates that badly: the causal family has 48
+members spanning ~4.3 independent directions (participation ratio), spectral 52
+spanning 7.6. So redundant groups are over-penalised ~3x. Replacing p_g with the
+measured effective dimension *did* stabilise the recovered family across lambda
+(distance at both 0.002 and 0.01, where raw flipped) — but it did **not** solve
+the actual problem, which turned out to be that lambda was simply mis-tuned. The
+literature modules plus a lambda path made it unnecessary. Diagnosis correct,
+remedy superfluous.
+
+**Binary axes as the primary readout.** After finding the hand families
+incoherent, I moved to reporting only `directed x nonlinear`. That was an
+over-correction: it is statistically clean but discards the resolution that
+makes a 300-statistic vocabulary worth having, and "directed statistics win on a
+directed problem" largely restates the Markov-equivalence theorem. Measured
+against modules it also loses: eta^2 0.197 vs 0.575. Axes survive as a coarse
+summary (z=22 from 4 cells is efficient), not as the deliverable.
+
+**Kuramoto as a symmetric-coupling negative control.** Planned, then dropped. A
+separate dataset would change coupling type AND generator AND M AND T AND the
+SPI distribution simultaneously, so a null result there would be
+uninterpretable. The collider-vs-{chain,fork} binary task is a tighter control
+and free: a collider's parents are independent so corr~0 separates it
+symmetrically, while chain-vs-fork provably cannot be separated symmetrically —
+same instances, same vocabulary, only the labels change (`--class-labels 0 0 1`).
+
+**tanh as the R1 nonlinearity** (the multi-regime spec's suggestion). Measured
+to be a weak test: tanh is monotone, so linear GC tracks it nearly as well as a
+nonlinear measure (|pearson| 0.734 vs MI 0.389; the corr gap stays under 0.02
+even at gain 40). Kept in the generator for completeness, not used. A
+non-monotone coupling is required for linear statistics to actually fail.
+
+**GPU training.** Investigated with profiling, rejected. At M=20/K=297/batch=32
+the per-graph Python loop is 46% of forward time and issues one `.item()` device
+sync PER GRAPH (32 stalls/batch); topk on (20,20) tensors is pure kernel-launch
+overhead. More fundamentally the parallelism is ACROSS thousands of independent
+fits, not within one, and a gpuvolta node gives 12 CPU cores per GPU — the same
+concurrency at a higher SU rate. CPU `normal` queue is correct.
+
+**Patching R1's marginals post-hoc.** Equalising each channel's lag-1
+autocorrelation to a common target moved node-feature leakage 0.93 -> 0.88 only,
+because squaring alters the whole spectrum rather than just first-order
+structure. Abandoned in favour of moving the nonlinearity to the observation
+stage, where it is motif-independent by construction.
+
+**Sequential battery execution.** The first battery pinned BLAS to one thread
+(correct — many small independent fits) and then ran the ten configurations
+one after another, using 1 of 12 cores. Measured on the live job: r0_baselines
+alone needed ~6.7 h of an 8 h wall. Fixed by dispatching with `xargs -P`, then
+by sharding the two long runs across seeds via `--seed-offset`.
+
+### 3.4 Bugs found (all fixed; each would have corrupted conclusions)
 
 | bug | effect |
 |---|---|
@@ -166,7 +224,7 @@ Conclusion: discrimination flows through `phi` over the full vocabulary;
 | `PARQUET` not forwarded through `qsub -v` | 3.2 MB/dataset of unused output (~90% of storage) |
 | TUH montage confounded with class | `02_tcp_le` 73% FNSZ vs `01_tcp_ar` 44%; manifest now single-montage |
 
-### 3.4 Process errors worth recording
+### 3.5 Process errors worth recording
 
 - lambda was tuned twice on a single point of the n-curve and was wrong both
   times (0.002 chosen at n=100, 0.01 at n=400). There is a genuine
