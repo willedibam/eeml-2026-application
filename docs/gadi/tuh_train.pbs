@@ -1,0 +1,99 @@
+#!/bin/bash
+# TUH experiment battery. Runs after generation (chained via depend=afterok).
+#
+#   qsub docs/gadi/tuh_train.pbs
+#
+# Order matters here. On real EEG the CONTROLS decide whether anything else is
+# interpretable, so they run first and are reported first:
+#
+#   node-only   per-channel statistics only. If this clears chance, the classes
+#               differ in what individual channels DO rather than how they
+#               couple, the SPI vocabulary is mismatched, and the coupling claim
+#               is void. This is exactly how motor-imagery and SelfRegulationSCP1
+#               failed (CLAUDE.md scope).
+#   shuffled    SPI values permuted across pairs. Tests that pair correspondence,
+#               not the marginal distribution of SPI values, carries the signal.
+#
+# Every run uses --group-by-patient. TUH cuts ~5.5 windows per recording, so an
+# instance-level random split would place the same subject on both sides and the
+# score would measure memorisation. Inter-subject variance swamping inter-class
+# variance is the documented failure mode for pooled EEG.
+
+#PBS -N tuh_train
+#PBS -P ql44
+#PBS -q normal
+#PBS -l ncpus=12
+#PBS -l mem=96GB
+#PBS -l walltime=04:00:00
+#PBS -l storage=scratch/ql44+gdata/ql44
+#PBS -l wd
+#PBS -j oe
+
+set -uo pipefail
+
+DATA="${DATA:-/scratch/ql44/we2614/mts-spi-data/260728_tuh}"
+SEEDS="${SEEDS:-5}"
+NTRAIN="${NTRAIN:-20 50 100 200}"
+JOBS="${JOBS:-4}"
+
+module purge
+module load python3/3.12.1
+export UV_CACHE_DIR="${UV_CACHE_DIR:-/scratch/ql44/we2614/uv-cache}"
+source .venv/bin/activate
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1 KMP_DUPLICATE_LIB_OK=TRUE
+unset CUDA_VISIBLE_DEVICES || true
+mkdir -p logs results
+
+echo "[INFO] TUH battery start $(date)  data=$DATA"
+for c in fnsz gnsz; do
+  echo "  $c: $(find "$DATA/$c" -name spi_mpis.npz 2>/dev/null | wc -l) instances"
+done
+
+run () {  # tag, models, lambda
+  python -u -m src.run_pipeline --data-dir "$DATA" \
+    --class-names fnsz gnsz --group-by-patient \
+    --mode sample-efficiency --n-train $NTRAIN \
+    --test-per-class 150 --val-per-class 100 --seeds "$SEEDS" \
+    --models $2 --group-lambda "$3" --spi-groups literature \
+    --device cpu --tag "$1" > "logs/$1.log" 2>&1 \
+    && echo "### done $1" || echo "### FAIL $1"
+}
+
+# controls first, then the model, then lambda sensitivity -- all in parallel
+( run tuh_controls "node-only shuffled" 0.01 ) &
+( run tuh_main     "spi-mpnn latent-directed fixed-spi" 0.01 ) &
+( run tuh_gl002    "spi-mpnn" 0.002 ) &
+( run tuh_gl005    "spi-mpnn" 0.005 ) &
+wait
+
+REPORT="logs/tuh_report.txt"
+{
+echo "==================== TUH REPORT ===================="
+for t in tuh_controls tuh_main tuh_gl002 tuh_gl005; do
+  f="results/sample_efficiency_${t}_results.json"
+  [[ -f "$f" ]] || { echo "-- $t MISSING (see logs/$t.log)"; continue; }
+  echo; echo "-------- $t --------"
+  grep -m1 "patient-split" "logs/$t.log" || echo "  [no patient-split line -- CHECK]"
+  python - "$f" <<'PY'
+import json,sys
+r=json.load(open(sys.argv[1]))
+ms=sorted(r['results'][max(r['results'],key=int)]['models'])
+print("  n    " + "".join(f"{m:>20}" for m in ms))
+for n in sorted(r['results'],key=int):
+    d=r['results'][n]['models']
+    print(f"  {n:<5}" + "".join(f"{d[m]['f1_mean']:>13.4f}+/-{d[m]['f1_std']:.2f}" for m in ms))
+PY
+  PYTHONPATH=. python docs/enrichment_2x2.py "$f" 2>/dev/null \
+    | grep -E "F1=|directed |nonlinear|M[0-9]{2} |MXX " || true
+done
+echo
+echo "READ THE CONTROLS FIRST."
+echo "  node-only near 0.50 (chance) => classes differ in COUPLING, claim is live."
+echo "  node-only high              => classes differ in per-channel activity;"
+echo "                                 SPI vocabulary mismatched, claim is void."
+echo "  shuffled near 0.50          => pair correspondence carries the signal."
+echo "==================== END ===================="
+} | tee "$REPORT"
+
+echo "[INFO] done $(date). report: $REPORT"
