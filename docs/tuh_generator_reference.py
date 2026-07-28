@@ -169,41 +169,79 @@ def run_pyspi(ts_TM: np.ndarray, pyspi_config: str) -> dict[str, np.ndarray]:
     return out
 
 
-def generate_session(edf: Path, csv_lab: Path, split: str, out_root: Path,
-                     pyspi_config: str) -> int:
-    """Emit per-instance dirs for one session. Returns #instances written."""
+def session_windows(edf: Path, csv_lab: Path, split: str,
+                    out_root: Path) -> list[Path]:
+    """PASS 1: write every window's timeseries.npy. Returns the instance dirs.
+
+    Cheap -- EDF read, filter, resample, slice. No SPI computation. Splitting
+    the expensive part out is what lets the pool run over WINDOWS instead of
+    sessions: a session's windows were computed serially inside one worker, so
+    a shard's wall time was set by its longest session (5+ h) no matter how the
+    sessions were chunked across nodes.
+
+    meta.json is deliberately NOT written here. It carries the SPI list, is
+    written last by pass 2, and is therefore the marker that an instance is
+    complete -- which is what makes pass 2 resumable.
+    """
     seiz_type = next((t for t in FOCUS_TYPES
                       if read_seizure_intervals(csv_lab, t)), None)
     if seiz_type is None:
-        return 0
+        return []
     sig, fs = load_bipolar(edf)
     sig, fs = preprocess(sig, fs)
 
     patient = edf.parts[-4]   # <split>/<patient>/<session>/<montage>/<file>
     session = edf.parts[-3]
-    written = 0
+    dirs: list[Path] = []
     for span in read_seizure_intervals(csv_lab, seiz_type):
         for k, win in enumerate(windows_from_span(sig, fs, span)):
             ts = zscore(win)                        # (T, M)
-            spis = run_pyspi(ts, pyspi_config)
             name = f"{patient}__{session}__s{int(span[0])}_w{k}"
-            # Flat class dirs: <out_root>/<fnsz|gnsz>/<instance>. The eeml
-            # pipeline discovers classes as immediate subdirectories, and the
-            # official split is recorded in meta.json instead -- splitting is
-            # done by PATIENT at training time, not by directory.
             d = out_root / seiz_type / name
             d.mkdir(parents=True, exist_ok=True)
             np.save(d / "timeseries.npy", ts)
-            np.savez(d / "spi_mpis.npz", **spis)
-            meta = {"pyspi": {"spis": [{"name": n} for n in spis]},
-                    "source": {"patient": patient, "session": session,
-                               "split": split, "seizure_type": seiz_type,
-                               "fs": fs, "M": ts.shape[1], "T": ts.shape[0]}}
-            (d / "meta.json").write_text(json.dumps(meta, indent=2))
-            written += 1
-    return written
+            (d / ".source.json").write_text(json.dumps(
+                {"patient": patient, "session": session, "split": split,
+                 "seizure_type": seiz_type, "fs": fs,
+                 "M": ts.shape[1], "T": ts.shape[0]}))
+            dirs.append(d)
+    return dirs
 
 
-# Pilot driver: iterate a small list of (edf, csv, split) tuples produced by
-# docs/tuh_discovery.py, cap total instances, measure wall-clock per instance.
-# Full run = the same, fanned out as Gadi array jobs over sessions.
+def compute_window_spis(inst_dir: Path, pyspi_config: str) -> str:
+    """PASS 2: compute and write spi_mpis.npz for one instance. Resumable.
+
+    Returns "skip" if meta.json already exists, "ok" on success.
+
+    The npz is written to a temp name and renamed, which is atomic on POSIX.
+    Without that, a walltime kill could leave a truncated archive that opens
+    fine and raises only when a particular member is touched -- and a
+    skip-if-exists check would then skip it forever.
+    """
+    if (inst_dir / "meta.json").exists():
+        return "skip"
+    ts = np.load(inst_dir / "timeseries.npy")
+    spis = run_pyspi(ts, pyspi_config)
+    # Must end in .npz: np.savez APPENDS the extension when it is absent, so a
+    # "spi_mpis.npz.tmp" target silently becomes "spi_mpis.npz.tmp.npz" and the
+    # rename below fails for every window.
+    tmp = inst_dir / "spi_mpis.tmp.npz"
+    np.savez(tmp, **spis)
+    tmp.replace(inst_dir / "spi_mpis.npz")
+    src = json.loads((inst_dir / ".source.json").read_text())
+    meta = {"pyspi": {"spis": [{"name": n} for n in spis]}, "source": src}
+    (inst_dir / "meta.json").write_text(json.dumps(meta, indent=2))
+    return "ok"
+
+
+def generate_session(edf: Path, csv_lab: Path, split: str, out_root: Path,
+                     pyspi_config: str) -> int:
+    """Emit per-instance dirs for one session. Returns #instances written.
+
+    Kept as the single-session path; the sharded driver uses the two passes
+    above so that one long session cannot set a whole shard's wall time.
+    """
+    dirs = session_windows(edf, csv_lab, split, out_root)
+    for d in dirs:
+        compute_window_spis(d, pyspi_config)
+    return len(dirs)

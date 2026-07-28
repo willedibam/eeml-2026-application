@@ -76,48 +76,79 @@ shard, chunk = int(shard), int(chunk)
 rows = [r for r in csv.reader(open(manifest)) if r and not r[0].startswith("#")]
 mine = rows[(shard - 1) * chunk: shard * chunk]
 print(f"[INFO] {len(mine)} sessions in this shard (of {len(rows)})", flush=True)
+NW = int(os.environ.get("PBS_NCPUS", 24))
+
 
 def resolve(root: Path, rel: str) -> Path:
     """Locate a staged file whose manifest path starts with 'edf/'.
 
-    stage_data.sh joins DEST (which itself ends in /edf) with the manifest path
-    (which also begins with edf/), so files land under <root>/edf/<split>/...
-    Both layouts are accepted rather than assuming one, because getting this
-    wrong fails SILENTLY: every session reports MISSING_EDF, the job exits 0,
-    and nothing is written.
+    stage_data.sh joins DEST (which ends in /edf) with the manifest path (which
+    also begins with edf/), so files land under <root>/edf/<split>/... Both
+    layouts are accepted rather than assuming one, because getting this wrong
+    fails SILENTLY: every session reports MISSING_EDF, the job exits 0, and
+    nothing is written.
     """
-    for cand in (root / rel,                       # <root>/edf/train/...
-                 root / Path(rel).relative_to("edf")):  # <root>/train/...
+    for cand in (root / rel, root / Path(rel).relative_to("edf")):
         if cand.exists():
             return cand
     return root / rel
 
 
-def one(row):
-    edf_rel, csv_rel, split = row[0], row[1], row[2]
-    edf = resolve(Path(edf_root), edf_rel)
-    lab = resolve(Path(edf_root), csv_rel)
+def extract(row):
+    edf = resolve(Path(edf_root), row[0])
+    lab = resolve(Path(edf_root), row[1])
     if not edf.exists():
-        return (edf.name, f"MISSING_EDF ({edf})")
+        return (edf.name, f"MISSING_EDF ({edf})", [])
     try:
-        return (edf.name, G.generate_session(edf, lab, split, Path(out), cfg))
+        return (edf.name, "ok", G.session_windows(edf, lab, row[2], Path(out)))
     except Exception as e:
-        return (edf.name, f"ERR {type(e).__name__}: {e}")
+        return (edf.name, f"ERR {type(e).__name__}: {e}", [])
 
-ok = err = win = 0
-with ProcessPoolExecutor(max_workers=int(os.environ.get("PBS_NCPUS", 48))) as ex:
-    for f in as_completed([ex.submit(one, r) for r in mine]):
-        name, res = f.result()
-        if isinstance(res, int):
-            ok += 1; win += res
+
+# PASS 1 -- extract windows. Cheap (EDF read + resample), finishes in minutes,
+# and tells us exactly how much work pass 2 has.
+todo, ok, err = [], 0, 0
+with ProcessPoolExecutor(max_workers=NW) as ex:
+    for f in as_completed([ex.submit(extract, r) for r in mine]):
+        name, status, dirs = f.result()
+        if status == "ok":
+            ok += 1; todo += dirs
         else:
-            err += 1; print(f"  {name}: {res}", flush=True)
-print(f"[INFO] sessions ok={ok} err={err}  windows written={win}")
-if win == 0:
+            err += 1; print(f"  {name}: {status}", flush=True)
+print(f"[INFO] pass 1: sessions ok={ok} err={err} windows={len(todo)}", flush=True)
+
+
+def spis(d):
+    try:
+        return (d.name, G.compute_window_spis(d, cfg))
+    except Exception as e:
+        return (d.name, f"ERR {type(e).__name__}: {e}")
+
+
+# PASS 2 -- one task per WINDOW, not per session. A session's windows used to be
+# computed serially inside one worker, so a shard's wall time was set by its
+# longest session however sessions were chunked across nodes. Skips any window
+# whose meta.json exists, so a re-run after a walltime kill resumes.
+done = skipped = failed = 0
+with ProcessPoolExecutor(max_workers=NW) as ex:
+    for i, f in enumerate(as_completed([ex.submit(spis, d) for d in todo]), 1):
+        name, status = f.result()
+        if status == "ok":
+            done += 1
+        elif status == "skip":
+            skipped += 1
+        else:
+            failed += 1; print(f"  {name}: {status}", flush=True)
+        if i % 25 == 0:
+            print(f"  [progress] {i}/{len(todo)} windows", flush=True)
+
+written = done + skipped
+print(f"[INFO] sessions ok={ok} err={err}  windows written={written} "
+      f"(new={done} resumed={skipped} failed={failed})")
+if written == 0:
     # Exit non-zero so a chained `qsub -W depend=afterok` does NOT start
     # training on an empty dataset. The first run of this job exited 0 after
-    # three seconds having written nothing, and the chained training job ran
-    # anyway.
+    # three seconds having written nothing, and the chained training ran anyway.
     print("[FATAL] no windows written -- failing so dependent jobs do not run")
     sys.exit(2)
 PY
