@@ -20,6 +20,7 @@
 #PBS -l storage=scratch/ql44+gdata/ql44
 #PBS -l wd
 #PBS -j oe
+#PBS -r y
 
 set -uo pipefail
 
@@ -32,7 +33,7 @@ OUT="${OUT:-/scratch/ql44/we2614/mts-spi-data/260728_tuh}"
 GEN_REPO="${GEN_REPO:-$HOME/mts-spi-study-cluster}"
 PYSPI_CONFIG="${PYSPI_CONFIG:-$GEN_REPO/configs/pyspi-v2/benchmarked90_amortized_config.yaml}"
 CHUNK="${CHUNK:-24}"
-SHARD="${PBS_ARRAY_INDEX:-1}"
+SHARD="${PBS_ARRAY_INDEX:-${SHARD:-1}}"
 
 module purge
 module load python3/3.12.1
