@@ -162,8 +162,11 @@ tautology into the contribution.
 
 ## Compute
 
-Clusters: **NCI Gadi** and **USYD Physics**. `CLUSTER_SETUP.md` is likely stale —
-re-verify paths/modules by asking the user to run commands there. The
+Clusters: **NCI Gadi** (primary) and USYD Physics. See **`docs/CLUSTER.md`** —
+verified 2026-07-28, supersedes the stale `CLUSTER_SETUP.md`. Key points: CPU
+only (profiled; a GPU is slower here and the parallelism is across fits, not
+within one), `copyq` for anything needing internet, login nodes reap long
+processes, and pyspi generation is memory-bandwidth bound at ~3.6 GB/worker. The
 `benchmarked90_amortized_config.yaml` (297 SPIs, ~5.5s/SPI cap) is much cheaper
 than the abstract's config and enables **more, larger-M, faster** MTS datasets —
 the enabling lever for the multi-regime study.
