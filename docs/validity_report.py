@@ -45,6 +45,32 @@ GATES = ("node-only", "shuffled")
 PRIMARY = ("spi-mpnn", "fixed-spi", "mlp-mix")
 
 
+def _sibling_gates(path: Path, classes: list, ns: list) -> dict:
+    """Gates for this run held in a SIBLING file.
+
+    Training is now sharded per model, so a run's controls live in their own
+    result files and a per-file audit would mark every model UNGATED even
+    though the gates were run. Borrowing is only allowed from a file in the
+    same directory that agrees on the classes and the n grid, so gates cannot
+    be silently imported from a different dataset.
+    """
+    out: dict[str, dict] = {}
+    for other in sorted(path.parent.glob("*_results.json")):
+        if other == path:
+            continue
+        try:
+            r = json.load(open(other))
+        except Exception:                              # noqa: BLE001
+            continue
+        se = r.get("results") or {}
+        if (r.get("classes") or []) != classes or sorted(se) != ns:
+            continue
+        for g in GATES:
+            if g in se[max(se, key=int)].get("models", {}):
+                out.setdefault(g, {"file": other.name, "results": se})
+    return out
+
+
 def audit(path: Path, margin: float, chance_override: float | None):
     try:
         r = json.load(open(path))
@@ -57,11 +83,20 @@ def audit(path: Path, margin: float, chance_override: float | None):
     n_key = ns[-1]
     models = se[n_key].get("models", {})
     classes = r.get("classes") or []
+    borrowed = {}
+    if not any(g in models for g in GATES):
+        borrowed = _sibling_gates(path, classes, sorted(se))
     chance = chance_override or (1 / len(classes) if classes else float("nan"))
     one_seed = r.get("seeds", 0) == 1
 
+    def _blk(m, n=None):
+        n = n or n_key
+        if m in borrowed:
+            return borrowed[m]["results"][n].get("models", {})
+        return se[n].get("models", {})
+
     def f1(m, n=None):
-        blk = se[n or n_key].get("models", {})
+        blk = _blk(m, n)
         return blk[m]["f1_mean"] if m in blk else None
 
     def sig_above(m, n=None, per_seed=False):
@@ -84,7 +119,7 @@ def audit(path: Path, margin: float, chance_override: float | None):
         With a single seed there is no variance estimate and both degenerate to
         the margin; such runs are marked so the verdict is not over-read.
         """
-        blk = se[n or n_key].get("models", {})
+        blk = _blk(m, n)
         if m not in blk:
             return None
         d = blk[m]
@@ -120,6 +155,7 @@ def audit(path: Path, margin: float, chance_override: float | None):
         "gates": {g: f1(g) for g in GATES},
         "breach": {g: breach(g) for g in GATES},
         "n_min": int(ns[0]), "one_seed": one_seed,
+        "borrowed": sorted({v["file"] for v in borrowed.values()}),
         "primary": next(((m, f1(m)) for m in PRIMARY if f1(m) is not None),
                         (None, None)),
     }
@@ -170,7 +206,8 @@ def main(paths: list[Path], margin: float, chance: float | None) -> None:
               f"{d['chance']:>7.3f} {fmt(g['node-only']):>10} "
               f"{fmt(g['shuffled']):>9} {fmt(pf):>9}  {d['verdict']}"
               + (f"  [{pm}]" if pm and pm != "spi-mpnn" else "")
-              + ("  (1 seed)" if d.get("one_seed") else ""))
+              + ("  (1 seed)" if d.get("one_seed") else "")
+              + ("  [gates from siblings]" if d.get("borrowed") else ""))
 
     n_bounded = sum(d["verdict"].startswith("BOUNDED") for d in rows)
     n_void = sum(d["verdict"].startswith("VOID") for d in rows)
