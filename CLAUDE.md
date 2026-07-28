@@ -5,7 +5,7 @@ Guidance for Claude Code working in this repo. Read this first.
 ## What this project is
 
 Graph construction for GNNs on multivariate time series (MTS) by learning a
-**linear probe over a vocabulary of ~125 named pairwise statistics (SPIs)**,
+**linear probe over a vocabulary of ~297 named pairwise statistics (SPIs)**,
 computed with `pyspi` (Cliff et al. 2023). The learned weight vector `w` is the
 scientific output: a named, falsifiable hypothesis about which form of coupling
 drives a task. Core adjacency: `A_ij = softplus(b + wᵀ E_ij)`, top-d sparsified.
@@ -30,8 +30,8 @@ src/
   utils.py          json/path helpers.
 visualization.py    Paper-quality figures (LaTeX/CM fonts). plot_family_weights = Fig 1b/1c.
 overleaf/           The submitted extended abstract (eeml_extended_abstract.tex) + refs.
-configs/pyspi/      pyspi configs. eeml.yaml = the ~136-SPI config used for the abstract.
-                    benchmarked90_amortized_config.yaml = faster 297-SPI config (see below).
+configs/pyspi/      pyspi configs. benchmarked90_amortized_config.yaml (297 SPIs) is
+                    THE vocabulary; eeml.yaml (~136) is the abstract's, retired.
 data/260327_eeml/   Primary VAR dataset: var-chain / var-fork / var-collider.
 figures*.ipynb      Figure generation notebooks.
 ```

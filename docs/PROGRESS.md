@@ -249,24 +249,68 @@ by sharding the two long runs across seeds via `--seed-offset`.
 
 ---
 
+### 2.6 The vocabulary: ~125/136 SPIs retired, ~297 is the standard
+
+The EEML abstract used `configs/pyspi/eeml.yaml` (~136 SPIs, ~125 after
+filtering). Everything from R0-297 onward uses
+`configs/pyspi/benchmarked90_amortized_config.yaml`: **297 SPIs**, the p90
+amortized-cost cut of pyspi's 328 (cutoff: fastest kept 5.52 s, slowest dropped
+6.79 s, benchmarked at M=16/T=800), plus two `te_kraskov` DCE variants added
+back by hand for methodological coverage. After robust-scale filtering, runs
+report K = 283-284.
+
+Why it replaced the small config, not merely supplemented it:
+- **Cheaper per SPI and broader.** It drops only the 31 slowest (`hhg` 506 s,
+  `ccm` ~332 s, `gpfit` 411 s) and keeps more than twice as many statistics.
+  Bigger vocabulary at lower cost -- this is what makes larger-M, more numerous
+  datasets affordable.
+- **Module coverage.** M01-M14 are all populated at 297; the small config left
+  several modules with too few members for module-level enrichment to have a
+  meaningful permutation null.
+- **The reported numbers are all at 297.** eta^2 = 0.575 for module identity,
+  the M01/M05/M06 enrichments, lambda-robustness over 50x.
+
+Consequences to respect: `--group-lambda` **must** be re-tuned when K changes
+(more groups shifts the sqrt(|g|) penalty scale); 0.005 at K~125, ~0.01 at
+K~284. Legacy result JSONs at K~125 are not comparable dimension-for-dimension
+and should not be pooled with 297 runs.
+
+The identical file exists in both repos (`configs/pyspi/` here,
+`configs/pyspi-v2/` in the generator repo); **verified byte-identical
+2026-07-28**. Generation uses the generator repo's copy.
+
+**pyspi is a fork, pinned.** `~/pyspi-fork` branch `v2`, commit `703c73a`
+(`willedibam/pyspi`), editable-installed in the generator venv -- confirmed via
+`pyspi.__file__` on the running job. It carries estimator **correctness** fixes,
+not only speed work: kernel-entropy NORMALISE scale term, Theiler-MI counting,
+KSG-AIS auto-embed for kraskov TE, plus the cache amortization the benchmarked
+config's cost model depends on. SPI values computed against upstream PyPI pyspi
+are therefore *different numbers*, not just slower ones. Any reproduction must
+use this fork. (Verified: commit subjects and import path. Not verified: the
+diffs themselves.)
+
 ## 5. Current state (2026-07-28, update when it changes)
 
 **Jobs in flight** (all batch; nothing depends on an SSH session)
 
-| job | what | gate |
+| job | what | status |
 |---|---|---|
-| `eeml_baselines` | validity gates (`node-only`, `shuffled`) + latent-vs-vocabulary on R0/R1 | — |
-| `regime` (TAG=r1b) | R1b enrichment: does the signature shift toward nonlinear modules? | — |
-| `tuh_gen` | TUH pyspi generation, **pilot only** (114 sessions ~ 315/class) | — |
-| `tuh_train` | TUH battery, chained `depend=afterok` on `tuh_gen` | — |
-| `tuh_stage` (copyq) | staging the full 322-session manifest | runs regardless; cheap |
+| `eeml_baselines` | validity gates + latent-vs-vocabulary on R0/R1 | running |
+| `regime` x3 | R1b lambda sweep (0.0002, 0.005) + control/upper-bound panel (0.001) | running |
+| `tuh_gen` array x14 | TUH pyspi generation, **all 322 sessions**, CHUNK=24 | queued |
 
-**Deliberately NOT submitted:** generation for the remaining 208 TUH sessions.
-It costs ~3.6 kSU and is gated on the pilot's controls. If `node-only` clears
-chance on the pilot, focal-vs-generalized differs in per-channel activity rather
-than coupling, the vocabulary is mismatched, and the extra sessions would be
-wasted. Submit only if the pilot controls pass:
-`bash docs/gadi/submit_tuh.sh docs/tuh/manifest.csv 8`
+**TUH staging is complete and verified** (2026-07-28): 322 EDFs at
+`/scratch/ql44/we2614/tusz/edf`, 0 missing against the manifest, 0 outside the
+`01_tcp_ar` montage, 0 truncated, 161 fnsz / 161 gnsz.
+
+**The pilot gate was dropped, deliberately.** The plan was to withhold full
+generation until the 114-session pilot's `node-only` control passed. That gate
+was unsatisfiable as designed: `CHUNK=8` takes the first 8 manifest rows, which
+are all fnsz, so the pilot could not produce a two-class dataset and could never
+have run a control. With 138 kSU of 151 available and full generation costing
+~2-3.6 kSU (<3%), generating everything and gating the *interpretation* on the
+controls is cheaper than another pilot round-trip. The controls still gate every
+conclusion -- `tuh_train.pbs` runs and reports them first.
 
 **Outputs to collect**
 ```
@@ -281,7 +325,7 @@ logs/tuh_report.txt                    # TUH battery -- READ CONTROLS FIRST
 | eeml repo (Gadi) | `/scratch/ql44/we2614/eeml-2026-application` |
 | generator repo (Gadi) | `~/mts-spi-study-cluster` (branch `refactor-lagged-warping`) |
 | synthetic data | `/scratch/ql44/we2614/mts-spi-data/{260727_r0_297,260728_r1b_obs}` |
-| staged EDFs | `/scratch/ql44/tusz/edf` |
+| staged EDFs | `/scratch/ql44/we2614/tusz/edf` (322, verified) |
 | TUH output | `/scratch/ql44/we2614/mts-spi-data/260728_tuh` |
 
 **Operational lessons**
@@ -294,6 +338,8 @@ logs/tuh_report.txt                    # TUH battery -- READ CONTROLS FIRST
 
 **Decided, do not relitigate**
 - Report literature modules; families are retired (eta^2 0.575 vs 0.135).
+- The vocabulary is the **297-SPI benchmarked config** (2.6). The ~125/136-SPI
+  abstract config is retired; do not mix K~125 and K~297 results.
 - `w` is a diagnostic overlay, not a performance component.
 - Skip Kuramoto; the collider-vs-rest binary task is tighter and free.
 - After R1b, stop adding synthetic regimes and go to TUH.
@@ -305,6 +351,22 @@ logs/tuh_report.txt                    # TUH battery -- READ CONTROLS FIRST
    language; interpretability is the whole contribution.
 3. R1b shows no shift -> the method reads directedness but not mechanism type;
    publishable as a limitation.
+
+**R1b, first pass: at chance and uninterpretable.** F1 0.347/0.306/0.415 at
+n=100/400/700 against 0.333 chance, non-monotonic. The enrichment printed
+underneath it (M05 4.66x, z=11.7) is void: a signature from a classifier at
+chance is group-lasso geometry, not recovered mechanism. Three things were
+missing and all three were process failures, not data failures --
+`run_regime.sh` hardcoded `--models spi-mpnn`, so there was **no control and no
+upper bound**, and lambda was left at the R0-tuned 0.01.
+
+The live hypothesis is over-regularisation, not an unsolvable task: R1b's `x^2`
+observation squares the coupling (`alpha` 0.2 -> effective 0.04), so R1b is R0
+at a fraction of the effect size, and the reported |w| RMS values (M05 0.0046,
+all others 0.0006-0.0012) are consistent with `w` crushed toward zero, which
+degenerates the adjacency to a constant. Unverified until the sweep returns.
+This repeats a documented past mistake: the un-retuned lambda after the sqrt(|g|)
+change cost F1 0.627 vs 0.973.
 
 ---
 
