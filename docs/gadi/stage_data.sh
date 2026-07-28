@@ -12,7 +12,7 @@
 set -euo pipefail
 
 PROJECT="${PROJECT:-ql44}"
-DEST="${DEST:-/scratch/${PROJECT}/tusz/edf}"
+DEST="${DEST:-/scratch/${PROJECT}/${USER}/tusz/edf}"
 REMOTE="nedc-tuh-eeg@www.isip.piconepress.com"
 ROOT="data/tuh_eeg/tuh_eeg_seizure/v2.0.6"
 KEY="${KEY:-${HOME}/.ssh/id_ed25519}"
