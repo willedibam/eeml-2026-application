@@ -251,22 +251,28 @@ by sharding the two long runs across seeds via `--seed-offset`.
 
 ## 5. Current state (2026-07-28, update when it changes)
 
-**In flight**
-- R1b training (`docs/run_regime.sh ... r1b 0.01 5`) — does the signature shift
-  toward nonlinear modules when coupling is nonlinear? Data is complete
-  (3000/3000, balanced, 0 truncated) at
-  `/scratch/ql44/we2614/mts-spi-data/260728_r1b_obs`.
-- `eeml_baselines` PBS — validity gate (`node-only`, `shuffled`) plus the
-  latent-vs-vocabulary comparison, on R0 and the old R1, sharded by seed.
-- TUH chain (`docs/gadi/tuh_pipeline.sh`, login node, tmux) — stages 322
-  sessions (~7 GB, ~2 h), then generation, then `tuh_train.pbs` chained via
-  `depend=afterok`.
+**Jobs in flight** (all batch; nothing depends on an SSH session)
+
+| job | what | gate |
+|---|---|---|
+| `eeml_baselines` | validity gates (`node-only`, `shuffled`) + latent-vs-vocabulary on R0/R1 | — |
+| `regime` (TAG=r1b) | R1b enrichment: does the signature shift toward nonlinear modules? | — |
+| `tuh_gen` | TUH pyspi generation, **pilot only** (114 sessions ~ 315/class) | — |
+| `tuh_train` | TUH battery, chained `depend=afterok` on `tuh_gen` | — |
+| `tuh_stage` (copyq) | staging the full 322-session manifest | runs regardless; cheap |
+
+**Deliberately NOT submitted:** generation for the remaining 208 TUH sessions.
+It costs ~3.6 kSU and is gated on the pilot's controls. If `node-only` clears
+chance on the pilot, focal-vs-generalized differs in per-channel activity rather
+than coupling, the vocabulary is mismatched, and the extra sessions would be
+wasted. Submit only if the pilot controls pass:
+`bash docs/gadi/submit_tuh.sh docs/tuh/manifest.csv 8`
 
 **Outputs to collect**
 ```
-logs/tuh_report.txt                        # TUH battery, controls first
-eeml_baselines.o*        (BASELINES block) # latent vs vocabulary
-logs/r1b.log / the run_regime report       # R1b enrichment
+logs/r1b_report.txt                    # R1b enrichment
+eeml_baselines.o*  (BASELINES block)   # latent vs vocabulary
+logs/tuh_report.txt                    # TUH battery -- READ CONTROLS FIRST
 ```
 
 **Paths**
@@ -278,20 +284,27 @@ logs/r1b.log / the run_regime report       # R1b enrichment
 | staged EDFs | `/scratch/ql44/tusz/edf` |
 | TUH output | `/scratch/ql44/we2614/mts-spi-data/260728_tuh` |
 
+**Operational lessons**
+- Anything over a few minutes goes in the queue. `run_regime.sh` run
+  interactively on a login node died with the SSH session and lost a training
+  run; NCI also reaps long login-node processes.
+- Staging belongs on `copyq` (internet AND batch durability), not tmux.
+- `qsub -v` splits on COMMAS, so a comma inside a value breaks submission with
+  an unhelpful message. `regime.pbs` takes `+` instead.
+
 **Decided, do not relitigate**
 - Report literature modules; families are retired (eta^2 0.575 vs 0.135).
 - `w` is a diagnostic overlay, not a performance component.
-- Skip Kuramoto; the collider-vs-rest binary task is the tighter negative
-  control and is free.
+- Skip Kuramoto; the collider-vs-rest binary task is tighter and free.
 - After R1b, stop adding synthetic regimes and go to TUH.
 
-**Next decisions, gated on the above**
-1. If TUH `node-only` clears chance → coupling claim is void there; report the
-   scope limit rather than the enrichment.
-2. If `latent-directed` ties `spi-mpnn` at every n → drop all
-   sample-efficiency language; the contribution is interpretability alone.
-3. If R1b shows no shift → the method reads directedness but not mechanism
-   type; publishable as a limitation.
+**Next decisions, gated on the pending outputs**
+1. TUH `node-only` clears chance -> coupling claim void there; report the scope
+   limit, do not generate the remaining 208 sessions.
+2. `latent-directed` ties `spi-mpnn` at every n -> drop sample-efficiency
+   language; interpretability is the whole contribution.
+3. R1b shows no shift -> the method reads directedness but not mechanism type;
+   publishable as a limitation.
 
 ---
 
