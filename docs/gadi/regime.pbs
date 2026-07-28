@@ -2,6 +2,7 @@
 # Generic regime report as a BATCH job.
 #
 #   qsub -v DATA=<dir>,CLASSES=<c1+c2+c3>,TAG=<tag>[,LAM=0.01][,SEEDS=5] \
+#        [,MODELS=spi-mpnn+fixed-spi+node-only] \
 #        docs/gadi/regime.pbs
 #
 # NOTE the '+' separator for CLASSES. `qsub -v` splits its argument on COMMAS to
@@ -29,6 +30,10 @@ CLASSES="${CLASSES//+/,}"   # accept + as the qsub-safe separator
 TAG="${TAG:?set TAG}"
 LAM="${LAM:-0.01}"
 SEEDS="${SEEDS:-5}"
+# Optional model list, same '+' separator and same reason as CLASSES.
+MODELS="${MODELS:-spi-mpnn}"
+MODELS="${MODELS//+/ }"
+export MODELS
 
 module purge
 module load python3/3.12.1
