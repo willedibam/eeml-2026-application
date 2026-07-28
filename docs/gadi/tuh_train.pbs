@@ -64,7 +64,11 @@ GOT=$(grep -h "sessions ok=" tuh_gen.o* 2>/dev/null \
       | sed -E 's/.*ok=([0-9]+) err=([0-9]+).*/\1 \2/' \
       | awk '{t += $1 + $2} END {print t+0}')
 echo "[INFO] generation accounted for $GOT of $WANT manifest sessions"
-if [ "$WANT" -gt 0 ] && [ "$GOT" -lt "$WANT" ]; then
+if [ "${ALLOW_PARTIAL:-0}" = "1" ]; then
+  echo "[WARN] ALLOW_PARTIAL=1 -- training on a PARTIAL corpus by request."
+  echo "       Controls (node-only, shuffled) are still valid on a subset;"
+  echo "       accuracy and signature will change when the rest arrives."
+elif [ "$WANT" -gt 0 ] && [ "$GOT" -lt "$WANT" ]; then
   echo "[FATAL] generation incomplete ($GOT/$WANT sessions)."
   echo "        Shards still running would be written to WHILE this job reads"
   echo "        them. Wait for 'tuh_gen shards: 0 still running', then resubmit."
