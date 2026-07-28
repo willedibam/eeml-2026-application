@@ -1,0 +1,80 @@
+#!/bin/bash
+# TUH: EDF -> windows -> pyspi, as a PBS array job.
+#
+#   bash docs/gadi/submit_tuh.sh <manifest.csv>       # wrapper handles batching
+#
+# Cost, extrapolated from the R1 measurement (M=20/T=1000 -> 3000 s/dataset at
+# 48 concurrent workers, memory-bandwidth bound): M=22/T=1024 is ~1.2x the pairs,
+# so ~3700 s/window. Yield is 5.5 windows/session (measured over 20 patients), so
+# the 322-session manifest is ~1770 windows ~= 1820 CPU-hours ~= 3.6 kSU.
+#
+# EDFs must already be staged (docs/gadi/stage_data.sh, login node -- compute
+# nodes have no internet).
+
+#PBS -N tuh_gen
+#PBS -P ql44
+#PBS -q normal
+#PBS -l ncpus=48
+#PBS -l mem=190GB
+#PBS -l walltime=02:00:00
+#PBS -l storage=scratch/ql44+gdata/ql44
+#PBS -l wd
+#PBS -j oe
+
+set -uo pipefail
+
+MANIFEST="${MANIFEST:?set MANIFEST}"
+EDF_ROOT="${EDF_ROOT:-/scratch/ql44/tusz/edf}"
+OUT="${OUT:-/scratch/ql44/we2614/mts-spi-data/260728_tuh}"
+PYSPI_CONFIG="${PYSPI_CONFIG:-/scratch/ql44/we2614/mts-spi-study-cluster/configs/pyspi-v2/benchmarked90_amortized_config.yaml}"
+CHUNK="${CHUNK:-8}"
+SHARD="${PBS_ARRAY_INDEX:-1}"
+
+module purge
+module load python3/3.12.1
+export UV_CACHE_DIR="${UV_CACHE_DIR:-/scratch/ql44/we2614/uv-cache}"
+source .venv/bin/activate
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1 KMP_DUPLICATE_LIB_OK=TRUE
+unset CUDA_VISIBLE_DEVICES || true
+mkdir -p logs "$OUT"
+
+echo "[INFO] shard $SHARD  chunk=$CHUNK  manifest=$MANIFEST  out=$OUT"
+
+PYTHONPATH=. python -u - "$MANIFEST" "$EDF_ROOT" "$OUT" "$PYSPI_CONFIG" \
+                        "$SHARD" "$CHUNK" <<'PY'
+import csv, sys, os
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from pathlib import Path
+sys.path.insert(0, "docs")
+import tuh_generator_reference as G
+
+manifest, edf_root, out, cfg, shard, chunk = sys.argv[1:7]
+shard, chunk = int(shard), int(chunk)
+rows = [r for r in csv.reader(open(manifest)) if r and not r[0].startswith("#")]
+mine = rows[(shard - 1) * chunk: shard * chunk]
+print(f"[INFO] {len(mine)} sessions in this shard (of {len(rows)})", flush=True)
+
+def one(row):
+    edf_rel, csv_rel, split = row[0], row[1], row[2]
+    edf = Path(edf_root) / Path(edf_rel).relative_to("edf")
+    lab = Path(edf_root) / Path(csv_rel).relative_to("edf")
+    if not edf.exists():
+        return (edf.name, "MISSING_EDF")
+    try:
+        return (edf.name, G.generate_session(edf, lab, split, Path(out), cfg))
+    except Exception as e:
+        return (edf.name, f"ERR {type(e).__name__}: {str(e)[:60]}")
+
+ok = err = win = 0
+with ProcessPoolExecutor(max_workers=int(os.environ.get("PBS_NCPUS", 48))) as ex:
+    for f in as_completed([ex.submit(one, r) for r in mine]):
+        name, res = f.result()
+        if isinstance(res, int):
+            ok += 1; win += res
+        else:
+            err += 1; print(f"  {name}: {res}", flush=True)
+print(f"[INFO] sessions ok={ok} err={err}  windows written={win}")
+PY
+
+echo "[INFO] shard $SHARD done $(date)"
