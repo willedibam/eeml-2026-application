@@ -23,3 +23,11 @@ build/
 
 # Office temp lock files
 ~$*
+
+# Result JSONs and logs are GENERATED ARTIFACTS produced on the cluster. They
+# were committed by accident (a `git add -A` after rsyncing them down for local
+# analysis) which bloated the repo and blocked `git pull` on Gadi, where the
+# same files exist untracked. Analysis scripts read them from wherever they sit;
+# nothing needs them in version control.
+results/
+logs/
