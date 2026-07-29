@@ -99,6 +99,56 @@ never selected. Members are interchangeable; the module is not.
 
 ---
 
+### 2.7 TUH (focal vs generalized seizure): NEGATIVE, and cleanly so
+
+The real-data bet did not pay off. Full run, patient-disjoint, 5 seeds, 46/52
+patients, 1427 windows (macro F1; chance 0.5):
+
+| n | 20 | 50 | 100 | 200 | 350 |
+|---|---|---|---|---|---|
+| `node-only` | 0.520 | 0.568 | 0.516 | 0.516 | 0.531 |
+| `shuffled` | 0.607 | 0.574 | 0.585 | 0.593 | 0.565 |
+| **`spi-mpnn`** | 0.593 | 0.542 | 0.570 | 0.584 | **0.547** |
+| `latent-directed` | 0.579 | 0.584 | 0.586 | 0.597 | 0.560 |
+| `fixed-spi` | 0.579 | 0.578 | 0.578 | 0.584 | 0.567 |
+
+**Nothing learns.** Every model sits in 0.52-0.61 and none improves with a 17x
+increase in training data. For contrast the same model goes 0.67 -> 0.99 on R0
+and 0.40 -> 0.67 on R1b over the same range.
+
+**`shuffled` matches or beats `spi-mpnn` at 4 of 5 sample sizes.** So the small
+amount of information present is in the marginal DISTRIBUTION of SPI values, not
+in which pair carries which value. Pair correspondence -- the thing the method
+is about -- contributes nothing here.
+
+**The pre-registered prediction is falsified.** The hypothesis was that focal
+seizures (directed propagation from a source) versus generalized (symmetric
+bilateral synchrony) would load the signature onto directed measures. Measured:
+`directed` **0.88x, z = -2.6** -- significantly DEPLETED. `directed & nonlinear`
+0.75x, z = -2.4. The weight instead concentrates on M14 (1.32x, z=5.9) and MXX
+(1.29x, z=4.7), and the top six SPIs are ALL precision-matrix estimators
+(`prec_GraphicalLassoCV`, `prec_ShrunkCovariance`, `prec_OAS`, ...), i.e. the
+most generic contemporaneous linear descriptors in the vocabulary. That is what
+a model with no coupling signal falls back on.
+
+**What this does and does not establish.** It is a scope result, not a method
+failure: `CLAUDE.md` already states the method works only when classes differ in
+HOW channels couple. Focal vs generalized apparently does not, at this patient
+count and window length. Confounds that are NOT ruled out and should be stated
+rather than used as excuses:
+- **8 s windows (T=1024) across 22 channels = 231 pairs.** Estimator variance
+  per SPI may swamp any class difference at this length.
+- **98 patients, ~8 in the test split.** The estimate is patient-dominated;
+  regeneration added 163 windows but **zero new patients**, so more of the same
+  corpus cannot fix it.
+- Window-level rather than patient-level classification.
+
+**Do not spend more compute here without changing one of those.** Per the
+stopping rule, TUH becomes the scope panel and the poster rests on the synthetic
+calibration, which is now considerably stronger: two fully gated regimes
+(2.5a), the order-specificity result (2.5c), and a measured signature shift in a
+pre-registered direction.
+
 ## 3. Failures and what they cost
 
 ### 3.1 R1 (nonlinear coupling) is confounded — result withdrawn
