@@ -101,4 +101,16 @@ The runner writes one JSON file per (block, effect, θ, n, T, M, seed, learner) 
 
 ## Gate 1 results
 
-Not yet run.
+**Compute policy (user, 19 October):** run nothing locally beyond small tests; experiments run on Gadi. The first, local run (clean commit `74a0ab7`, `results/information_lattice/gate1-261019/`) was stopped once that was stated. Only the LP validity block completed (320/320); LP power is partial (961/1540) and will be rerun on Gadi.
+
+**LP validity (θ ∈ {0, 1}, n=1000, T=1024, M=4, 20 seeds):** P1 calibration 15/15 pass; P2 specificity 18/18 hard nulls pass; P4 seam pass (R2dirP IS 0/20, seam 2/20). P3 has 35/37 pass; it fails only R4env/IS (14/20, accuracy 0.550) and R4env/IO (1/20). The LP feature set barely detects envelope coupling at a scrambled lag. This is a probe limitation, to be revised, not a lattice failure. Confirmed predictions:
+
+- R2 is visible through lag-free dependence (dep 20/20, time 0/20). G0 retains it at 0.967 accuracy via periodogram co-fluctuation, confirming that G0 is not a univariate cell.
+- R2dir lives only in timing (time 20/20, time2 20/20, dep 0/20).
+- U4 lives only in higher-order univariate structure (highU 20/20).
+- R4quad and R4pac live in higher-order dependence (high and dep 20/20; G1 at chance).
+
+Deviations to carry forward:
+
+- R4env's G1 cell is 0.561 (15/20; pre-specified "~"). Second-order sample statistics carry a measurable trace of envelope co-modulation, so "second-order" must be read as information in second-order sample statistics.
+- IS − IO is not a pure seam test for dependence effects. IO also loses coupling through partial overlap of its offset crops (R2 IO 0.844). P4 rests on the timing-only R2dirP, as pre-specified.
