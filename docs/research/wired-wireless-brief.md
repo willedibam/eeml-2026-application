@@ -79,6 +79,8 @@ Note the [Brain Network Transformer](https://proceedings.neurips.cc/paper_files/
 
 Attention *between statistic tokens* is a learned, supervised generalisation of SPI–SPI: with linear embeddings, q_a·k_b = x_aᵀWx_b, and W = I recovers Pearson. Consider it only as an optional arm for recording-level tasks, where many recordings and pair-localised or nonlinear agreement could justify it. A cheaper middle ground is a pair-weighted SPI–SPI, x_aᵀ diag(v) x_b with learned or ground-truth-defined pair weights.
 
+**Statistics versus a learned broad prior.** The sample-efficiency claim (M1) amounts to saying that the pyspi catalogue is a human-curated broad prior over dependence types, and that it substitutes for the breadth a learned prior would need. Test this directly. Add an arm: vanilla attention pretrained on a broad synthetic prior of networks with mixed signalling modes, spanning parameter ranges wider than Gate 0, then fine-tuned on worms. If it matches SBA's learning curves, the statistics are only a cheap prior. If SBA still wins, they carry information that simulation priors miss. The SBA arms need no such pretraining: they learn a low-dimensional w_h (K weights, or about 14 after grouping by statistic family) from dense supervision. Worm data give many neurons × frames, with identities conserved across animals. Report *effective* sample size, though: calcium dynamics are slow and autocorrelated, and state switches are few per recording.
+
 **Tasks.** (a) Forecast held-out time and held-out *animals*. (b) Predict a masked neuron from the others (Creamer's held-out-neuron test). (c) Optionally, decode behavioural state.
 
 **Interpretability toolkit:**
