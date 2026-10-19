@@ -1,0 +1,36 @@
+# Gate 1 grid, pre-specified in ../README.md on 19 October 2026.
+root_seed = 20261019
+n_test = 500
+
+[blocks.validity]
+effects = ["U2", "U4", "R2", "R2dir", "R2dirP", "R4env", "R4quad", "R4pac"]
+thetas = [0.0, 1.0]
+n_train = [1000]
+shapes = [[1024, 4]]  # [T, M]
+cells = ["X", "CS", "IS", "IO", "XR", "G1", "G0", "U0"]
+seeds = { lp = 20, mr = 20 }
+
+[blocks.validity-cnn]
+effects = ["U2", "U4", "R2", "R2dir", "R2dirP", "R4env", "R4quad", "R4pac"]
+thetas = [1.0]
+n_train = [1000]
+shapes = [[1024, 4]]
+cells = ["X", "CS", "IS", "IO", "XR", "G1", "G0", "U0"]
+seeds = { cnn = 5 }
+
+[blocks.power]
+effects = ["U2", "U4", "R2", "R2dir", "R4env", "R4quad", "R4pac"]
+thetas = [0.125, 0.25, 0.5, 1.0]
+n_train = [100, 300, 1000]
+exclude = [[1.0, 1000]]
+shapes = [[1024, 4]]
+cells = ["CS", "IS", "XR", "G1", "G0", "U0"]
+seeds = { lp = 20, mr = 10 }
+
+[blocks.scale]
+effects = ["U2", "U4", "R2", "R2dir", "R4env", "R4quad", "R4pac"]
+thetas = [0.5]
+n_train = [300]
+shapes = [[256, 4], [4096, 4], [1024, 16], [1024, 32]]
+cells = ["CS", "IS", "XR", "G1", "G0", "U0"]
+seeds = { lp = 20, mr = 10 }

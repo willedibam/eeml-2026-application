@@ -1,3 +1,3 @@
 # Workstream context
 
-- [Research reset and submission direction](research-reset.md) — Audit of EEML evidence, corrected symmetry premise, literature constraints; lead candidate is the group-surrogate information lattice (pending user decision), forecasting selector demoted.
+- [Research reset and submission direction](research-reset.md) — Audit of EEML evidence, corrected symmetry premise, literature constraints; adopted direction is the group-surrogate information lattice (Gate 1 in `research/information_lattice/`); forecasting selector demoted.

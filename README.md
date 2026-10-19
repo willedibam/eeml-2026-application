@@ -2,7 +2,7 @@
 
 Research reset of the EEML 2026 application. The current deliverable is an audited research foundation and a literature-grounded agenda, **not a submission-ready paper or a validated new forecasting method**.
 
-Start with the [research assessment](docs/research/assessment.md), the lead [candidate question](docs/research/information-lattice.md) (pending decision), the earlier [agenda and literature map](docs/research/agenda.md), and the [durable context index](docs/context/INDEX.md).
+Start with the [research assessment](docs/research/assessment.md), the adopted [research question](docs/research/information-lattice.md) and its [study](research/information_lattice/README.md), the earlier [agenda and literature map](docs/research/agenda.md), and the [durable context index](docs/context/INDEX.md).
 
 ## Layout
 
@@ -10,7 +10,7 @@ Start with the [research assessment](docs/research/assessment.md), the lead [can
 | --- | --- |
 | `src/spigraph/` | Reusable preprocessing and data/evaluation contracts |
 | `research/premise_audit/` | Executable check of the historical symmetry claim |
-| `research/information_lattice/` | Exploratory toy check of the candidate group-surrogate decomposition |
+| `research/information_lattice/` | The information-lattice study: cells, planted effects, learners, Gate 1 runner |
 | `tests/` | Fast, data-independent correctness tests |
 | `scripts/` | Repository/data audit utilities |
 | `configs/` | Current extraction policy; future experiment configurations |

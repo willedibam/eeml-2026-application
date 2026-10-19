@@ -1,6 +1,8 @@
 # Candidate direction: where does task information live in multichannel recordings?
 
-Proposed 19 October 2026 by a second review of the reset. **Not adopted; awaiting the user's decision.** It replaces the [forecasting selector](agenda.md) as the lead candidate because that direction is largely pre-empted (see the agenda's addendum). Novelty is plausible after a targeted search, not established.
+Proposed 19 October 2026 by a second review of the reset and **adopted by the user the same day**. It replaces the [forecasting selector](agenda.md), which is largely pre-empted (see the agenda's addendum). Novelty is plausible after a targeted search, not established. The executable protocol, Gate 1 and its results are in [`research/information_lattice/`](../../research/information_lattice/README.md).
+
+**Correction made while pre-specifying Gate 1.** IS and G0 are not univariate cells. Coupling survives independent shifts at a scrambled lag (maximum circular cross-correlation over all lags), and periodogram magnitudes co-fluctuate under G0. Univariate information requires XR, a within-class cross-record shuffle that is not a group action. The axes are therefore univariate → lag-free dependence → relative timing, crossed with second-order → higher-order. The study README holds the current cell and contrast definitions; the 2×2 description below is superseded where it conflicts.
 
 ## Question
 
