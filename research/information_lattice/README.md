@@ -2,7 +2,7 @@
 
 **Question.** For a supervised task on multichannel recordings, where does the decodable label information live? The candidates are single channels, dependence between channels regardless of lag, the relative timing of channels, and second-order versus higher-order structure. Do current learners extract it? Direction adopted 19 October 2026. [Rationale and positioning](../../docs/research/information-lattice.md).
 
-**Status.** Gate 1 (synthetic validity and power) is pre-specified below. Results and deviations are recorded in [Gate 1 results](#gate-1-results) once run.
+**Status.** Parked 19 October 2026: judged too narrow to be the paper's question; see [context](../../docs/context/research-reset.md). Kept as an instrument for exact ablation of context content. The LP validity block of Gate 1 ran; see [Gate 1 results](#gate-1-results).
 
 ## Cells
 
