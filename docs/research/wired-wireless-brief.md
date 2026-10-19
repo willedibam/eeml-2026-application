@@ -71,6 +71,14 @@ w_h is a per-head weight vector over named statistics, optionally sparse or grou
 
 Note the [Brain Network Transformer](https://proceedings.neurips.cc/paper_files/paper/2022/hash/a408234a9b80604a9cf6ca518e474550-Abstract-Conference.html) argument that graph-transformer edge encodings fit complete correlation graphs poorly. Address it; do not ignore it.
 
+**Relations among the statistics themselves (SPI–SPI versus attention over statistics).** The K×K Pearson matrix of the statistics across channel pairs (the user's SPI–SPI representation) discards pair identity, so it cannot answer the edge-level question of who signals to whom. It is used here in three supporting roles:
+
+1. **Grouping or whitening the statistic basis**, so each w_h is identifiable. Collinear statistics make per-statistic weights non-unique: in the archived study no single statistic reached 0.8 stability-selection frequency.
+2. **A direct S2 test**: SPI–SPI computed separately over chemical, gap-junction, peptidergic-only and unconnected pairs. Does the joint organisation of statistics differ by signalling mode? This is the natural bridge to the PhD line.
+3. **A baseline descriptor** for recording-level tasks, such as behavioural state.
+
+Attention *between statistic tokens* is a learned, supervised generalisation of SPI–SPI: with linear embeddings, q_a·k_b = x_aᵀWx_b, and W = I recovers Pearson. Consider it only as an optional arm for recording-level tasks, where many recordings and pair-localised or nonlinear agreement could justify it. A cheaper middle ground is a pair-weighted SPI–SPI, x_aᵀ diag(v) x_b with learned or ground-truth-defined pair weights.
+
 **Tasks.** (a) Forecast held-out time and held-out *animals*. (b) Predict a masked neuron from the others (Creamer's held-out-neuron test). (c) Optionally, decode behavioural state.
 
 **Interpretability toolkit:**
